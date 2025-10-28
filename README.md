@@ -1,10 +1,10 @@
 # 🏠 RPi Home Server Stack
 
-A complete Docker Swarm-based home server solution providing file sharing, media streaming, home automation, SSL-secured reverse proxy access, and automated library synchronization.
+A complete Docker Compose-based home server solution providing file sharing, media streaming, home automation, SSL-secured reverse proxy access, and automated library synchronization.
 
 ## 📋 Overview
 
-This project provides a **fully automated, zero-configuration** home server stack using Docker Swarm. Simply run `./home_start.sh` and answer a few questions to deploy a complete media and home automation platform.
+This project provides a **fully automated, zero-configuration** home server stack using Docker Compose. Simply run `./home_start.sh` and answer a few questions to deploy a complete media and home automation platform.
 
 **🎯 Key Features:**
 - **🚀 One-Command Deployment** - Interactive setup handles everything automatically
@@ -68,7 +68,7 @@ cd rpi_home
 **That's it!** The `home_start.sh` script will:
 - 🖥️ **Interactive Setup**: Ask for your configuration (hostname, IPs, webshare credentials, Nextcloud user, etc.)
 - ✅ **Auto-Generate**: Create `tools/.env` file and nginx configuration
-- ✅ **Initialize Docker Swarm**: Set up container orchestration
+- ✅ **Setup Docker Environment**: Configure container orchestration
 - ✅ **Create Secrets**: Generate secure random database passwords
 - ✅ **Generate SSL Certificates**: Create certificates for your hostname/IPs
 - ✅ **Validate Configuration**: Verify all settings before deployment
@@ -160,11 +160,11 @@ rpi_home/
 **home_start.sh Complete Workflow:**
 1. Prerequisites check (Docker, OpenSSL, curl, cron, python3)
 2. Interactive configuration setup
-3. Docker Swarm initialization
+3. Docker environment setup
 4. SSL certificate generation
 5. Nginx configuration generation  
 6. Configuration validation
-7. Docker stack deployment
+7. Docker Compose deployment
 8. Auto-sync setup and initial library sync
 9. Service status verification
 
@@ -395,7 +395,7 @@ For VPN access without local DNS, use IP addresses directly:
 ## 🔐 Security
 
 - All services run behind SSL-terminated reverse proxy
-- Database credentials stored as Docker secrets
+- Database credentials stored as secret files
 - Media servers accessible via direct IP to bypass authentication
 - Home Assistant configured with trusted proxy headers
 
@@ -404,11 +404,13 @@ For VPN access without local DNS, use IP addresses directly:
 ### Service Status
 
 ```bash
+```bash
 # Check all services
-docker service ls
+docker compose -f tools/docker-compose.yml ps
 
 # View service logs
-docker service logs rpi_home_<service_name>
+docker compose -f tools/docker-compose.yml logs <service_name>
+```
 
 # View cleanup logs
 tail -f /var/log/docker-cleanup.log
@@ -448,10 +450,10 @@ ls -la logs/scheduled-sync.log
 **Services not starting:**
 ```bash
 # Check service logs
-docker service logs rpi_home_homeassistant
+docker compose -f tools/docker-compose.yml logs homeassistant
 
 # Restart specific service
-docker service update --force rpi_home_homeassistant
+docker compose -f tools/docker-compose.yml restart homeassistant
 ```
 
 **SSL certificate issues:**
@@ -460,16 +462,16 @@ docker service update --force rpi_home_homeassistant
 ./tools/create_ssl.sh
 
 # Restart nginx
-docker service update --force rpi_home_nginx
+docker compose -f tools/docker-compose.yml restart nginx
 ```
 
 **Database connection errors:**
 ```bash
 # Check database logs
-docker service logs rpi_home_db
+docker compose -f tools/docker-compose.yml logs db
 
 # Verify secrets exist
-docker secret ls
+ls -la secrets/
 ```
 
 **Scheduled sync not working:**
@@ -499,8 +501,8 @@ ls -la $VIDEO_PATH $IMAGE_PATH $DOC_PATH
 tail -20 logs/scheduled-cleanup.log
 
 # Force service refresh
-docker service update --force rpi_home_app
-docker service update --force rpi_home_jellyfin
+docker compose -f tools/docker-compose.yml restart app
+docker compose -f tools/docker-compose.yml restart jellyfin
 ```
 
 **Character encoding issues:**
@@ -542,7 +544,7 @@ docker system prune -a --volumes
 
 3. **System configuration**:
    - Cron jobs: `crontab -l > crontab_backup.txt`
-   - Docker secrets: Document recreation commands
+   - Secret files: Document recreation commands
 
 ### Git Workflow
 
@@ -606,14 +608,14 @@ This project is open source and available under the MIT License.
 For issues and questions:
 1. Run `./tools/validate_config.sh` to check configuration
 2. Check the troubleshooting section above
-3. Review service logs using `docker service logs rpi_home_<service_name>`
-4. Check deployment status with `docker service ls`
+3. Review service logs using `docker compose -f tools/docker-compose.yml logs <service_name>`
+4. Check deployment status with `docker compose -f tools/docker-compose.yml ps`
 5. Create an issue in the GitLab repository
 
 **Quick Diagnostics:**
 ```bash
 # Check all services status
-docker service ls
+docker compose -f tools/docker-compose.yml ps
 
 # Validate configuration
 ./tools/validate_config.sh

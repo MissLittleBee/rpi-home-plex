@@ -65,7 +65,7 @@ server {
     
     location /nextcloud/ {
         # Add trailing slash to proxy_pass to strip /nextcloud/ from path
-        proxy_pass http://rpi_home_app:80/;
+        proxy_pass http://app:80/;
         
         # Essential headers for Nextcloud
         proxy_set_header Host \$host;
@@ -99,7 +99,7 @@ server {
     }
     
     location /jellyfin/ {
-        proxy_pass http://rpi_home_jellyfin:8096/;
+        proxy_pass http://jellyfin:8096/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -127,7 +127,7 @@ server {
     }
     
     location /ws/ {
-        proxy_pass http://rpi_home_webshare-search:5000/;
+        proxy_pass http://webshare-search:5000/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -142,7 +142,7 @@ server {
 
     # Home Assistant - proxy entire root to HA
     location / {
-        proxy_pass http://rpi_home_homeassistant:8123;
+        proxy_pass http://${SERVER_IP}:8123;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

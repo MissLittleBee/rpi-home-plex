@@ -15,6 +15,12 @@ nginx/
 # Ignore sensitive config files
 tools/.env
 
+# docker-compose.yml is generated, ignore it
+tools/docker-compose.yml
+
+# Secret files
+secrets/
+
 # Ignore Docker and system files
 *.pid
 *.lock

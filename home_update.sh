@@ -11,7 +11,7 @@ echo ""
 
 # Function to check if stack exists
 stack_exists() {
-    docker stack ls --format "table {{.Name}}" | grep -q "^${STACK_NAME}$"
+    docker compose -f tools/docker-compose.yml ps -q | grep -q .
 }
 
 # Show current image versions
@@ -77,8 +77,10 @@ fi
 
 if stack_exists; then
     echo "Stack exists, performing rolling update..."
-    # Docker Swarm will perform rolling updates automatically
-    docker stack deploy -c tools/docker-compose.yml "$STACK_NAME"
+    # Docker Compose will recreate containers with new images
+    cd tools
+    docker compose up -d --force-recreate
+    cd ..
     
     echo "Waiting for services to update..."
     sleep 5
@@ -86,11 +88,13 @@ if stack_exists; then
     # Check service status
     echo ""
     echo "Service status after update:"
-    docker stack services "$STACK_NAME"
+    docker compose -f tools/docker-compose.yml ps
     
 else
     echo "Stack doesn't exist, deploying fresh..."
-    docker stack deploy -c tools/docker-compose.yml "$STACK_NAME"
+    cd tools
+    docker compose up -d
+    cd ..
 fi
 
 echo ""

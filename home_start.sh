@@ -286,14 +286,108 @@ if [ -z "$WEBSHARE_USERNAME" ] || [ -z "$WEBSHARE_PASSWORD" ] || [ -z "$HOSTNAME
 fi
 
 echo "✓ Configuration files verified"
+
+# USB Serial Device Detection for Home Assistant
+detect_usb_devices() {
+    echo ""
+    echo "🔌 USB Serial Device Detection for Home Assistant:"
+    
+    # Check if /dev/serial/by-id/ exists and has devices
+    if [ ! -d "/dev/serial/by-id/" ]; then
+        echo "  ℹ️  No USB serial devices directory found"
+        return
+    fi
+    
+    # Find USB serial devices
+    USB_DEVICE_LIST=()
+    while IFS= read -r -d '' device; do
+        if [ -c "$device" ]; then  # Check if it's a character device
+            USB_DEVICE_LIST+=("$device")
+        fi
+    done < <(find /dev/serial/by-id/ -name "*" -print0 2>/dev/null)
+    
+    if [ ${#USB_DEVICE_LIST[@]} -eq 0 ]; then
+        echo "  ℹ️  No USB serial devices detected"
+        return
+    fi
+    
+    echo "  Found ${#USB_DEVICE_LIST[@]} USB serial device(s):"
+    for i in "${!USB_DEVICE_LIST[@]}"; do
+        device="${USB_DEVICE_LIST[$i]}"
+        device_name=$(basename "$device")
+        # Try to get a friendlier name
+        friendly_name=$(echo "$device_name" | sed 's/usb-//g' | sed 's/_/ /g' | cut -d'-' -f1-3)
+        echo "    $((i+1)). $friendly_name"
+        echo "       Path: $device"
+    done
+    
+    echo ""
+    echo "These devices can be used by Home Assistant for:"
+    echo "  • Zigbee coordinators (ConBee, Sonoff, etc.)"
+    echo "  • Z-Wave controllers"
+    echo "  • Serial sensors and devices"
+    echo ""
+    
+    # Ask user which devices to add
+    selected_devices=""
+    read -p "Do you want to add any of these devices to Home Assistant? (y/N): " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "Select devices to add (enter numbers separated by spaces, or 'all' for all devices):"
+        read -p "Selection: " selection
+        
+        if [ "$selection" = "all" ]; then
+            # Add all devices
+            for device in "${USB_DEVICE_LIST[@]}"; do
+                if [ -n "$selected_devices" ]; then
+                    selected_devices="$selected_devices|$device"
+                else
+                    selected_devices="$device"
+                fi
+            done
+        else
+            # Add selected devices
+            for num in $selection; do
+                if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le ${#USB_DEVICE_LIST[@]} ]; then
+                    device="${USB_DEVICE_LIST[$((num-1))]}"
+                    if [ -n "$selected_devices" ]; then
+                        selected_devices="$selected_devices|$device"
+                    else
+                        selected_devices="$device"
+                    fi
+                fi
+            done
+        fi
+        
+        if [ -n "$selected_devices" ]; then
+            # Add to .env file
+            if grep -q "^USB_DEVICES=" tools/.env; then
+                sed -i "s|^USB_DEVICES=.*|USB_DEVICES=$selected_devices|" tools/.env
+            else
+                echo "USB_DEVICES=$selected_devices" >> tools/.env
+            fi
+            echo "✅ Selected USB devices will be available to Home Assistant"
+        else
+            echo "ℹ️  No valid devices selected"
+        fi
+    else
+        echo "ℹ️  Skipping USB device configuration"
+        # Remove USB_DEVICES from .env if it exists
+        sed -i '/^USB_DEVICES=/d' tools/.env 2>/dev/null || true
+    fi
+}
+
+# Run USB device detection
+detect_usb_devices
+
 echo ""
 
-# Initialize Docker Swarm if not already initialized
-if ! docker info | grep -q 'Swarm: active'; then
-    echo "Initializing Docker Swarm..."
-    docker swarm init || true
-else
-    echo "Docker Swarm already initialized."
+# Ensure Docker is running (no swarm needed for compose)
+echo "Checking Docker daemon status..."
+if ! docker info >/dev/null 2>&1; then
+    echo "Starting Docker service..."
+    sudo systemctl start docker
 fi
 
 # Check and create folders for volumes if missing
@@ -322,19 +416,26 @@ fi
 echo "Building webshare-search service..."
 docker build -f tools/Dockerfile.webshare -t rpi_home_webshare-search .
 
-# Generate random passwords for secrets (no logging)
+# Generate random passwords for secrets files (no logging)
 generate_secret() {
     openssl rand -base64 32
 }
 
-# Create or update Docker secrets (no password output)
-echo "Creating/updating Docker secrets..."
-(generate_secret | docker secret create db_root_password - 2>/dev/null) || \
-    (docker secret rm db_root_password >/dev/null 2>&1 && generate_secret | docker secret create db_root_password -)
-(generate_secret | docker secret create db_password - 2>/dev/null) || \
-    (docker secret rm db_password >/dev/null 2>&1 && generate_secret | docker secret create db_password -)
+# Create or update secret files
+echo "Creating/updating secret files..."
+mkdir -p secrets
 
-echo "Docker secrets created."
+# Generate secrets only if they don't exist
+if [ ! -f "secrets/db_root_password" ]; then
+    generate_secret > secrets/db_root_password
+fi
+if [ ! -f "secrets/db_password" ]; then
+    generate_secret > secrets/db_password
+fi
+
+# Set secure permissions
+chmod 600 secrets/db_*
+echo "Secret files created."
 
 # Setup storage paths and permissions
 setup_storage_permissions() {
@@ -477,11 +578,26 @@ echo "✓ Configuration validated successfully."
 # Export environment variables for Docker Compose
 export $(grep -v '^#' tools/.env | xargs)
 
-# Deploy local docker-compose.yml as stack
-echo "Deploying Docker stack..."
-docker stack deploy -c tools/docker-compose.yml rpi_home
+# Also export USB_DEVICES if it exists
+if grep -q "^USB_DEVICES=" tools/.env; then
+    export USB_DEVICES=$(grep "^USB_DEVICES=" tools/.env | cut -d'=' -f2)
+fi
 
-echo "Stack deployed successfully."
+# Generate docker-compose.yml if it doesn't exist or is outdated
+if [ ! -f "tools/docker-compose.yml" ] || [ "tools/.env" -nt "tools/docker-compose.yml" ]; then
+    echo "Generating docker-compose.yml configuration..."
+    ./tools/generate_yml.sh
+else
+    echo "✓ docker-compose.yml is up to date"
+fi
+
+# Deploy docker-compose services
+echo "Starting Docker Compose services..."
+cd tools
+docker compose up -d
+cd ..
+
+echo "Services started successfully."
 
 # Wait for services to start and check status
 echo "Waiting for services to initialize..."
@@ -492,7 +608,7 @@ echo "Waiting for services to stabilize before setting up automation..."
 sleep 30
 
 # Verify services are running before setting up automation
-STABLE_SERVICES=$(docker service ls --filter name=rpi_home --format "{{.Replicas}}" | grep -c "1/1" || echo "0")
+STABLE_SERVICES=$(docker compose -f tools/docker-compose.yml ps --format json | jq -r '.State' | grep -c "running" || echo "0")
 
 if [ "$STABLE_SERVICES" -ge 5 ]; then  # All 5 services should be running
     echo "✓ Services are stable - setting up automation systems"
@@ -537,15 +653,16 @@ echo "=== Deployment Complete! ==="
 echo ""
 
 # Check final service status
-RUNNING_SERVICES=$(docker service ls --filter name=rpi_home --format "table {{.Name}}\t{{.Replicas}}" | grep -c "1/1" || echo "0")
-TOTAL_SERVICES=$(docker service ls --filter name=rpi_home --format "table {{.Name}}" | wc -l)
-TOTAL_SERVICES=$((TOTAL_SERVICES - 1))  # Subtract header line
+cd tools
+RUNNING_SERVICES=$(docker compose ps --format json | jq -r '.State' | grep -c "running" || echo "0")
+TOTAL_SERVICES=$(docker compose ps --services | wc -l)
+cd ..
 
 echo "📊 Service Status: $RUNNING_SERVICES/$TOTAL_SERVICES services running"
 if [ "$RUNNING_SERVICES" -eq "$TOTAL_SERVICES" ]; then
     echo "✅ All services started successfully!"
 else
-    echo "⚠️  Some services may still be starting. Check with: docker service ls"
+    echo "⚠️  Some services may still be starting. Check with: docker compose -f tools/docker-compose.yml ps"
 fi
 
 echo ""
@@ -577,7 +694,7 @@ echo ""
 echo "🔧 Troubleshooting:"
 echo "  • Fix Home Assistant issues: ./tools/fix_homeassistant.sh"
 echo "  • Fix storage permissions: ./tools/scheduled-cleanup.sh cleanup"
-echo "  • Check service logs: docker service logs rpi_home_<service_name>"
+echo "  • Check service logs: docker compose -f tools/docker-compose.yml logs <service_name>"
 echo "  • Validate configuration: ./tools/validate_config.sh"
 echo ""
 echo "⚙️  Configuration:"

@@ -82,19 +82,19 @@ EOF
 restart_homeassistant() {
     echo "Restarting Home Assistant service..."
     
-    if docker service ls --filter name=rpi_home_homeassistant --format "{{.Name}}" | grep -q rpi_home_homeassistant; then
-        docker service update --force rpi_home_homeassistant
+    if docker compose -f docker-compose.yml ps homeassistant -q | grep -q .; then
+        docker compose -f docker-compose.yml restart homeassistant
         echo "✓ Home Assistant service restarted"
         
         echo "Waiting for Home Assistant to start..."
         sleep 15
         
         # Check if service is running
-        REPLICAS=$(docker service ls --filter name=rpi_home_homeassistant --format "{{.Replicas}}")
-        if [ "$REPLICAS" = "1/1" ]; then
-            echo "✅ Home Assistant is running successfully"
+        STATUS=$(docker compose -f docker-compose.yml ps homeassistant --format json | jq -r '.State')
+        if [[ "$STATUS" == "running" ]]; then
+            echo "✅ Home Assistant service is running after restart"
         else
-            echo "⚠️  Home Assistant may still be starting. Check logs with: docker service logs rpi_home_homeassistant"
+            echo "⚠️  Home Assistant may still be starting. Check logs with: docker compose -f docker-compose.yml logs homeassistant"
         fi
     else
         echo "❌ Home Assistant service not found. Make sure the stack is running."
@@ -119,6 +119,6 @@ else
     echo ""
     echo "📋 Access your Home Assistant:"
     echo "  • URL: https://ha.local/"
-    echo "  • Check logs: docker service logs rpi_home_homeassistant"
-    echo "  • Service status: docker service ls --filter name=rpi_home_homeassistant"
+    echo "  • Check logs: docker compose -f docker-compose.yml logs homeassistant"
+    echo "  • Service status: docker compose -f docker-compose.yml ps homeassistant"
 fi

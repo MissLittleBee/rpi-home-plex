@@ -28,15 +28,20 @@ rotate_log() {
 run_cleanup() {
     log "Starting scheduled Docker cleanup..."
 
-    # Safety check: Don't cleanup if Docker stack services are still starting
-    if docker service ls --filter name=rpi_home >/dev/null 2>&1; then
-        STARTING_SERVICES=$(docker service ls --filter name=rpi_home --format "{{.Replicas}}" | grep -v "1/1" | wc -l)
-        if [ "$STARTING_SERVICES" -gt 0 ]; then
-            log "Detected rpi_home services still starting ($STARTING_SERVICES not ready) - skipping cleanup for safety"
-            return
-        fi
-        log "rpi_home services are stable - proceeding with cleanup"
+    # Safety check: Don't cleanup if Docker Compose services are still starting
+    cd "$(dirname "$(dirname "$0")")/tools"
+    if docker compose ps -q >/dev/null 2>&1; then
+        STARTING_SERVICES=$(docker compose ps --format json | jq -r '.State' | grep -v "running" | wc -l)
+    else
+        STARTING_SERVICES=0
     fi
+    cd - >/dev/null
+    
+    if [ "$STARTING_SERVICES" -gt 0 ]; then
+        log "Detected rpi_home services still starting ($STARTING_SERVICES not ready) - skipping cleanup for safety"
+        return
+    fi
+    log "rpi_home services are stable - proceeding with cleanup"
 
     # Count containers before cleanup
     EXITED_COUNT=$(docker ps -a -f status=exited -q | wc -l)

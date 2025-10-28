@@ -1,26 +1,21 @@
 #!/bin/bash
-# home_stop.sh: Stop and remove Docker Swarm stack, containers, and perform cleanup
+# home_stop.sh: Stop and remove Docker Compose services, containers, and perform cleanup
 
 set -e
 
-STACK_NAME="rpi_home"
+PROJECT_NAME="rpi_home"
 
-# Check if stack exists before trying to remove it
-if docker stack ls --format "table {{.Name}}" | grep -q "^${STACK_NAME}$"; then
-    echo "Removing Docker stack: $STACK_NAME..."
-    docker stack rm "$STACK_NAME"
-    
-    # Wait for services to be removed (with progress indicator)
-    echo "Waiting for stack services to stop..."
-    while docker stack ls --format "table {{.Name}}" | grep -q "^${STACK_NAME}$"; do
-        echo -n "."
-        sleep 2
-    done
-    echo ""
-    echo "Stack $STACK_NAME removed successfully."
+# Check if services are running
+echo "Stopping Docker Compose services..."
+cd tools
+if docker compose ps -q | grep -q .; then
+    echo "Stopping services..."
+    docker compose down
+    echo "Services stopped successfully."
 else
-    echo "Stack $STACK_NAME is not running or doesn't exist."
+    echo "No running services found."
 fi
+cd ..
 
 # Optional: Clean up unused Docker resources (networks, images, build cache)
 echo ""
