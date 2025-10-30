@@ -29,6 +29,18 @@ command_exists() {
 install_docker() {
     echo "Installing Docker..."
     
+    # Detect OS
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+        VERSION_CODENAME=$VERSION_CODENAME
+    else
+        echo "Cannot detect OS. Trying generic installation..."
+        OS="unknown"
+    fi
+    
+    echo "Detected OS: $OS ($VERSION_CODENAME)"
+    
     # Update package index
     sudo apt-get update
     
@@ -39,16 +51,51 @@ install_docker() {
         gnupg \
         lsb-release
     
-    # Add Docker's official GPG key
-    sudo mkdir -m 0755 -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    
-    # Set up repository
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    
-    # Install Docker Engine
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # Choose installation method based on OS
+    if [ "$OS" = "debian" ]; then
+        echo "Installing Docker for Debian..."
+        
+        # Add Docker's official GPG key for Debian
+        sudo mkdir -m 0755 -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        
+        # Set up Debian repository
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # Install Docker Engine
+        sudo apt-get update
+        
+        # Check if Docker CE is available, otherwise use docker.io from Debian repos
+        if sudo apt-cache show docker-ce >/dev/null 2>&1; then
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        else
+            echo "Docker CE not available, installing docker.io from Debian repositories..."
+            sudo apt-get install -y docker.io docker-compose
+        fi
+        
+    elif [ "$OS" = "ubuntu" ]; then
+        echo "Installing Docker for Ubuntu..."
+        
+        # Add Docker's official GPG key for Ubuntu
+        sudo mkdir -m 0755 -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        
+        # Set up Ubuntu repository
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # Install Docker Engine
+        sudo apt-get update
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+    else
+        echo "Unsupported OS or OS detection failed. Trying generic installation..."
+        # Fallback to distribution packages
+        sudo apt-get install -y docker.io docker-compose || {
+            echo "Failed to install Docker. Please install Docker manually."
+            echo "See: https://docs.docker.com/engine/install/"
+            return 1
+        }
+    fi
     
     # Add current user to docker group
     sudo usermod -aG docker $USER
@@ -122,11 +169,20 @@ fi
 
 # Verify Docker is accessible without sudo
 if ! docker info >/dev/null 2>&1; then
-    echo ""
-    echo "⚠️  Docker requires sudo access or user group membership."
-    echo "Please run 'newgrp docker' or log out and back in, then try again."
-    echo "Alternatively, run this script with sudo (not recommended for security)."
-    exit 1
+    # Check if user is in docker group but session hasn't refreshed
+    if groups $USER | grep -q docker; then
+        echo "⚠️  User is in docker group but session needs refresh. Using 'sg docker' to continue..."
+        
+        # Re-execute script with docker group privileges
+        echo "Restarting script with docker group privileges..."
+        exec sg docker -c "$0 $*"
+    else
+        echo ""
+        echo "⚠️  Docker requires sudo access or user group membership."
+        echo "Please run 'newgrp docker' or log out and back in, then try again."
+        echo "Alternatively, run this script with sudo (not recommended for security)."
+        exit 1
+    fi
 fi
 
 echo "All prerequisites satisfied!"
@@ -170,6 +226,20 @@ setup_configuration() {
         read -s -p "Webshare.cz password: " WEBSHARE_PASSWORD
         echo ""
     done
+    
+    echo ""
+    echo "🎬 Plex Media Server Configuration:"
+    echo "To link your Plex server to your account, you need a claim token."
+    echo "Get your claim token from: https://www.plex.tv/claim/"
+    echo "(Token is valid for 4 minutes, so get it just before entering it here)"
+    echo "Note: Token will be automatically removed from .env file after setup for security"
+    read -p "Plex claim token (optional, press Enter to skip): " PLEX_CLAIM_TOKEN
+    
+    if [ -n "$PLEX_CLAIM_TOKEN" ]; then
+        echo "✓ Plex claim token entered (will be used to link server to your account)"
+    else
+        echo "ℹ️  No claim token provided - you can manually claim the server later through Plex web interface"
+    fi
     
     echo ""
     echo "📁 Storage Configuration:"
@@ -224,6 +294,7 @@ setup_configuration() {
     echo "  Document Path: $DOC_PATH"
     echo "  Nextcloud User: $NEXTCLOUD_USER"
     echo "  Nextcloud Password: ✓ Set"
+    echo "  Plex Claim Token: $([ -n "$PLEX_CLAIM_TOKEN" ] && echo '✓ Provided' || echo 'Not provided')"
     echo "  Timezone: $TIMEZONE"
     echo ""
     
@@ -245,6 +316,9 @@ VPN_IP=$VPN_IP
 # Webshare.cz Configuration  
 WEBSHARE_USERNAME=$WEBSHARE_USERNAME
 WEBSHARE_PASSWORD=$WEBSHARE_PASSWORD
+
+# Plex Configuration
+PLEX_CLAIM_TOKEN=$PLEX_CLAIM_TOKEN
 
 # Storage Configuration
 VIDEO_PATH=$VIDEO_PATH
@@ -270,10 +344,27 @@ EOF
 
 # Check if configuration exists or run interactive setup
 if [ ! -f "tools/.env" ] || [ "$1" == "--reconfigure" ]; then
+    echo ""
+    echo "🔧 Configuration Setup Required"
+    if [ "$1" == "--reconfigure" ]; then
+        echo "  Reconfiguring as requested..."
+    else
+        echo "  No existing configuration found - running initial setup..."
+    fi
     setup_configuration
 else
+    echo ""
+    echo "🚀 Quick Restart Mode"
     echo "✓ Using existing tools/.env configuration"
-    echo "  Run with --reconfigure to change settings"
+    echo "  - Skipping interactive setup (configuration already exists)"
+    echo "  - Preserving existing Plex configuration and claim status"
+    echo "  - Reusing existing nginx and docker-compose configurations"
+    echo ""
+    echo "💡 Restart Workflow Options:"
+    echo "  - Quick restart: './home_stop.sh' (keep config) → './home_start.sh'"
+    echo "  - Fresh setup: './home_stop.sh' (remove config) → './home_start.sh'"
+    echo "  - Reconfigure: './home_start.sh --reconfigure'"
+    echo ""
 fi
 
 # Load configuration
@@ -391,7 +482,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # Check and create folders for volumes if missing
-for dir in ./nginx/conf.d ./nginx/cert ./volumes/nextcloud/db ./volumes/nextcloud/html ./volumes/nextcloud/data ./volumes/homeassistant/config ./volumes/jellyfin/config ./volumes/webshare; do
+for dir in ./nginx/conf.d ./nginx/cert ./volumes/nextcloud/db ./volumes/nextcloud/html ./volumes/nextcloud/data ./volumes/homeassistant/config ./volumes/plex/config ./volumes/plex/transcode ./volumes/webshare; do
     if [ ! -d "$dir" ]; then
         echo "Creating missing directory: $dir"
         mkdir -p "$dir"
@@ -433,9 +524,13 @@ if [ ! -f "secrets/db_password" ]; then
     generate_secret > secrets/db_password
 fi
 
-# Set secure permissions
-chmod 600 secrets/db_*
-echo "Secret files created."
+# Set secure permissions (handle existing files with different ownership)
+if ! chmod 600 secrets/db_* 2>/dev/null; then
+    echo "Using existing secret files with current permissions (owned by different user)"
+else
+    echo "Secret file permissions updated"
+fi
+echo "Secret files ready."
 
 # Setup storage paths and permissions
 setup_storage_permissions() {
@@ -533,6 +628,16 @@ setup_storage_permissions() {
     setup_directory_permissions "$DETECTED_IMAGE_PATH" "image" 
     setup_directory_permissions "$DETECTED_DOC_PATH" "document"
     
+    # Fix Nextcloud volume permissions (www-data user with media group)
+    echo "Setting up Nextcloud volume permissions..."
+    if [ -d "volumes/nextcloud/html" ] || [ -d "volumes/nextcloud/data" ]; then
+        sudo chown -R 33:$MEDIA_GID volumes/nextcloud/html volumes/nextcloud/data 2>/dev/null || true
+        sudo chmod -R g+w volumes/nextcloud/html volumes/nextcloud/data 2>/dev/null || true
+        echo "✓ Nextcloud volumes configured for www-data user with media group"
+    fi
+    
+    # Home Assistant uses internal config directory - no separate data volume needed
+    
     echo "✅ Storage permissions configured for shared access"
     
     # Export variables for docker-compose
@@ -562,9 +667,13 @@ EOF
 # Run setup functions
 setup_storage_permissions
 
-# Generate nginx configuration files first
-echo "Generating nginx configuration..."
-./tools/generate_nginx_config.sh
+# Generate nginx configuration files if needed
+if [ ! -f "nginx/conf.d/default.conf" ] || [ "tools/.env" -nt "nginx/conf.d/default.conf" ]; then
+    echo "🔧 Generating nginx configuration..."
+    ./tools/generate_nginx_config.sh
+else
+    echo "✅ Quick Restart: nginx configuration is up to date (using existing configuration)"
+fi
 
 # Validate configuration before deployment
 echo "Validating configuration..."
@@ -585,10 +694,12 @@ fi
 
 # Generate docker-compose.yml if it doesn't exist or is outdated
 if [ ! -f "tools/docker-compose.yml" ] || [ "tools/.env" -nt "tools/docker-compose.yml" ]; then
-    echo "Generating docker-compose.yml configuration..."
+    echo "🔧 Generating docker-compose.yml configuration..."
     ./tools/generate_yml.sh
 else
-    echo "✓ docker-compose.yml is up to date"
+    echo "✅ Quick Restart: docker-compose.yml is up to date (using existing configuration)"
+    echo "  - Preserving all existing service configurations"
+    echo "  - Plex claim token handling: skipped (already configured)"
 fi
 
 # Deploy docker-compose services
@@ -598,6 +709,14 @@ docker compose up -d
 cd ..
 
 echo "Services started successfully."
+
+# Clean up Plex claim token after successful deployment (security best practice)
+if [ -n "$PLEX_CLAIM_TOKEN" ] && [ -f "tools/.env" ]; then
+    echo "Cleaning up Plex claim token from .env file for security..."
+    sleep 30  # Give Plex container time to use the token
+    sed -i '/^PLEX_CLAIM_TOKEN=/d' tools/.env
+    echo "✓ Plex claim token removed from .env file (server should now be claimed)"
+fi
 
 # Wait for services to start and check status
 echo "Waiting for services to initialize..."
@@ -610,7 +729,7 @@ sleep 30
 # Verify services are running before setting up automation
 STABLE_SERVICES=$(docker compose -f tools/docker-compose.yml ps --format json | jq -r '.State' | grep -c "running" || echo "0")
 
-if [ "$STABLE_SERVICES" -ge 5 ]; then  # All 5 services should be running
+if [ "$STABLE_SERVICES" -ge 6 ]; then  # All 6 services should be running (nginx, db, nextcloud, homeassistant, plex, webshare)
     echo "✓ Services are stable - setting up automation systems"
     
     # Set up auto-sync cron jobs
@@ -671,14 +790,14 @@ echo ""
 echo "📁 Access your services:"
 echo "  • Home Assistant: https://${HOSTNAME}/"
 echo "  • Nextcloud: https://${HOSTNAME}/nextcloud/"
-echo "  • Jellyfin: https://${HOSTNAME}/jellyfin/"
+echo "  • Plex Media Server: https://${HOSTNAME}/plex/"
 echo "  • Webshare Search: https://${HOSTNAME}/ws/ (or http://${HOSTNAME}:5000/)"
 echo ""
 echo "🔄 Automation features:"
 echo "  • Libraries sync every 10 minutes automatically (cron)"
 echo "  • Docker cleanup runs every 6 hours automatically (cron)"  
 echo "  • Both systems restart automatically on reboot"
-echo "  • New downloads appear in both Nextcloud and Jellyfin"
+echo "  • New downloads appear in both Nextcloud and Plex"
 echo "  • Check sync logs: tail -f logs/scheduled-sync.log"
 echo "  • Check cleanup logs: tail -f logs/scheduled-cleanup.log"
 echo "  • View all cron jobs: crontab -l"
@@ -686,10 +805,24 @@ echo "  • Manual sync: ./tools/scheduled-sync.sh"
 echo "  • Manual cleanup: ./tools/scheduled-cleanup.sh"
 echo ""
 echo "📋 Next steps:"
-echo "  1. Configure Nextcloud admin account at https://${HOSTNAME}/nextcloud/"
-echo "  2. Set up Home Assistant at https://${HOSTNAME}/"
-echo "  3. Add media to Jellyfin library at https://${HOSTNAME}/jellyfin/"
-echo "  4. Test webshare search and download at https://${HOSTNAME}/ws/"
+echo "  1. 🌩️  Set up Nextcloud at https://${HOSTNAME}/nextcloud/"
+echo "     • Create admin account (username: ${NEXTCLOUD_USER:-admin})"
+echo "     • Database type: MySQL/MariaDB"
+echo "     • Database user: nextcloud"
+echo "     • Database password: $(cat secrets/db_password 2>/dev/null | head -c 20)..."
+echo "     • Database name: nextcloud"  
+echo "     • Database host: db (leave port empty)"
+echo "     • Data folder: /var/www/html/data (default)"
+echo ""
+echo "  2. 🏠 Set up Home Assistant at https://${HOSTNAME}/"
+echo ""
+echo "  3. 🎬 Set up Plex Media Server:"
+echo "     • Web browser access: https://${HOSTNAME}/plex/ (configured as local network)"
+echo "     • Direct device access: http://${SERVER_IP}:32400 (for apps, smart TVs)"
+echo "     • Add video library pointing to: /media/videos"
+echo "     • Server should already be claimed to your Plex account"
+echo ""
+echo "  4. 🔍 Test webshare search and download at https://${HOSTNAME}/ws/"
 echo ""
 echo "🔧 Troubleshooting:"
 echo "  • Fix Home Assistant issues: ./tools/fix_homeassistant.sh"
@@ -709,8 +842,34 @@ echo "  • Image path: ${DETECTED_IMAGE_PATH:-not detected}"
 echo "  • Document path: ${DETECTED_DOC_PATH:-not detected}"
 echo "  • Config file: $([ -f "$SCRIPT_DIR/config" ] && echo "config" || echo "tools/.env or auto-detected")"
 echo ""
+echo "🎬 Plex Network Access:"
+echo "  • Reverse Proxy (Web): https://${HOSTNAME}/plex/ - Optimized for local network detection"
+echo "  • Direct Access (Apps): http://${SERVER_IP}:32400 - For mobile apps, smart TVs, game consoles"
+echo "  • Auto-discovery: Devices on your network will find Plex automatically"
+echo "  • Both access methods support full streaming quality and local network features"
+echo ""
+echo "📝 Manual Setup Instructions:"
+echo ""
+echo "🌩️  NEXTCLOUD SETUP:"
+echo "  1. Go to: https://${HOSTNAME}/nextcloud/"
+echo "  2. Create admin account with any username/password you prefer"
+echo "  3. Database configuration:"
+echo "     Database & user: nextcloud"
+echo "     Database password: $(cat secrets/db_password 2>/dev/null || echo '[password from secrets/db_password]')"
+echo "     Database host: db"
+echo "     Leave other fields as default"
+echo "  4. Click 'Finish setup'"
+echo ""
+echo "🎬 PLEX SETUP:"
+echo "  1. Go to: https://${HOSTNAME}/plex/ or http://${SERVER_IP}:32400/web"
+echo "  2. Sign in with your Plex account"
+echo "  3. Name your server (e.g., 'Home Server')"
+echo "  4. Add library: Movies -> Browse for folder -> /media/videos"
+echo "  5. Add library: TV Shows -> Browse for folder -> /media/videos"
+echo ""
 echo "⚠️  Common Issues:"
-echo "  • Downloaded files not visible in Nextcloud/Jellyfin: Run ./tools/scheduled-cleanup.sh cleanup"
+echo "  • Downloaded files not visible in Nextcloud/Plex: Run ./tools/scheduled-cleanup.sh cleanup"
+echo "  • Plex shows 'Remote Access' in web browser: This is normal for reverse proxy, streaming still works"
 echo "  • Webshare 'File temporarily unavailable': This is from webshare.cz servers,"
 echo "    not our application. Try again later or choose a different file."
 echo "  • SSL certificate warnings: Expected for self-signed certificates"

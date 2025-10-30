@@ -46,7 +46,7 @@ fi
 echo ""
 echo "🔄 Automation Cleanup Options:"
 echo "This will remove:"
-echo "  • Cron jobs that sync Nextcloud and Jellyfin libraries every 10 minutes"
+echo "  • Cron jobs that sync Nextcloud and Plex libraries every 10 minutes"
 echo "  • Cron jobs that run Docker cleanup every 6 hours"
 echo "  • Reboot jobs that run sync and cleanup after system restart"
 echo ""
@@ -79,6 +79,48 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Automation jobs removed."
 fi
 
+# Optional: Clean up configuration files
+echo ""
+echo "🔧 Configuration Cleanup Options:"
+echo "This will remove configuration files and force fresh setup on next start:"
+echo "  • tools/.env (your environment variables and settings)"
+echo "  • tools/docker-compose.yml (generated compose file)"
+echo "  • nginx/conf.d/default.conf (nginx configuration)"
+echo ""
+echo "This is useful if you want to:"
+echo "  • Change hostname, IP addresses, or paths"
+echo "  • Reconfigure services from scratch"
+echo "  • Fix configuration issues"
+echo ""
+echo "This will NOT remove:"
+echo "  ✅ Your data volumes (Nextcloud files, Home Assistant config, Plex metadata)"
+echo "  ✅ Your media files"
+echo "  ✅ Database passwords (secrets/ directory)"
+echo ""
+echo "Note: If you keep configuration files, './home_start.sh' will restart quickly using existing settings"
+echo ""
+read -p "Do you want to remove configuration files for fresh setup? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Removing configuration files..."
+    
+    # Backup current config before removing
+    if [ -f "tools/.env" ]; then
+        cp "tools/.env" "tools/.env.backup.$(date +%Y%m%d_%H%M%S)"
+        echo "✓ Backed up current .env file"
+    fi
+    
+    # Remove configuration files
+    rm -f tools/.env
+    rm -f tools/docker-compose.yml  
+    rm -f nginx/conf.d/default.conf
+    
+    echo "✓ Configuration files removed - fresh setup will be required"
+    echo "✓ Backup of .env saved (you can restore settings from backup if needed)"
+else
+    echo "✓ Configuration files preserved - restart will use existing settings"
+fi
+
 echo ""
 echo "Cleanup complete. Stack and containers removed. Persistent data (volumes) preserved."
 echo ""
@@ -86,9 +128,13 @@ echo "📋 What was preserved:"
 echo "  • Media library and all your video files"
 echo "  • volumes/nextcloud/ (user files and database)"
 echo "  • volumes/homeassistant/ (configuration and data)"
-echo "  • volumes/jellyfin/ (metadata and settings)"
-echo "  • tools/.env file (your configuration settings)"
+echo "  • volumes/plex/ (metadata and settings)"
+if [ -f "tools/.env" ]; then
+    echo "  • tools/.env file (your configuration settings)"
+else
+    echo "  • Configuration removed - fresh setup required"
+fi
 echo "  • logs/ (sync and error logs)"
-echo "  • logs/scheduled-cleanup.log (cleanup logs, if automation was kept)"
+echo "  • secrets/ (database passwords)"
 echo ""
 echo "🚀 To restart the services: Run './home_start.sh'"

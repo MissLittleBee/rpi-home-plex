@@ -14,7 +14,7 @@ logs/
 # Volume data (only copy webshare app code)
 volumes/homeassistant/
 volumes/nextcloud/ 
-volumes/jellyfin/
+volumes/plex/
 
 # Python
 __pycache__

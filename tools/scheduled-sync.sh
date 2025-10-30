@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Scheduled sync script - runs every 10 minutes
-# This ensures both Jellyfin and Nextcloud stay in sync
+# This ensures both Plex and Nextcloud stay in sync
 
 # Get script directory and project root for proper path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,7 +24,7 @@ wait_for_containers() {
     local wait_time=0
     
     while [ $wait_time -lt $max_wait ]; do
-        if docker ps | grep -q "nextcloud" && docker ps | grep -q "jellyfin"; then
+        if docker ps | grep -q "nextcloud" && docker ps | grep -q "plex"; then
             log "Containers are ready"
             return 0
         fi
@@ -53,17 +53,39 @@ quick_nextcloud_scan() {
     fi
 }
 
-# Jellyfin API library refresh (non-disruptive)
-jellyfin_library_refresh() {
-    local container_id=$(docker ps --format "table {{.ID}}\t{{.Image}}" | grep "jellyfin" | awk '{print $1}' | head -1)
+# Plex library refresh (non-disruptive)
+plex_library_refresh() {
+    local container_id=$(docker ps --format "table {{.ID}}\t{{.Image}}" | grep "plex" | awk '{print $1}' | head -1)
     if [ -n "$container_id" ]; then
-        log "Refreshing Jellyfin library via API..."
-        # Try to refresh via API first (less disruptive)
-        docker exec "$container_id" curl -s -X POST "http://localhost:8096/Library/Refresh" -H "Content-Type: application/json" &>/dev/null
-        log "Jellyfin library refresh triggered"
+        log "Refreshing Plex library..."
+        # Trigger a library scan for all sections using Plex Media Scanner
+        docker exec "$container_id" /usr/lib/plexmediaserver/Plex\ Media\ Scanner --scan &>/dev/null
+        log "Plex library refresh triggered"
     else
-        log "ERROR: Jellyfin container not found"
+        log "ERROR: Plex container not found"
     fi
+}
+
+# Function to update Plex preferences for reverse proxy configuration (run once)
+update_plex_config_for_reverse_proxy() {
+    local plex_config_path="$PROJECT_ROOT/volumes/plex/config/Library/Application Support/Plex Media Server/Preferences.xml"
+    
+    if [ -f "$plex_config_path" ] && [ -n "$HOSTNAME" ] && [ -n "$SERVER_IP" ]; then
+        # Check if reverse proxy config is already applied
+        if ! grep -q "customConnections" "$plex_config_path"; then
+            log "Configuring Plex for reverse proxy access..."
+            
+            # Create backup
+            cp "$plex_config_path" "${plex_config_path}.backup.$(date +%Y%m%d_%H%M%S)"
+            
+            # Update Plex preferences with reverse proxy settings
+            sed -i "s/LastAutomaticMappedPort=\"[^\"]*\"/LastAutomaticMappedPort=\"0\" customConnections=\"https:\/\/${HOSTNAME}:443\/plex,http:\/\/${SERVER_IP}:32400\" allowedNetworks=\"10.0.0.0\/8,172.16.0.0\/12,192.168.0.0\/16,127.0.0.1\/32\" TreatWanIpAsLocal=\"1\" DisableRemoteSecurity=\"1\" LocalNetworkAddresses=\"${SERVER_IP}\" LanNetworksBandwidth=\"10.10.10.0\/24,172.16.0.0\/12,192.168.0.0\/16\"/" "$plex_config_path"
+            
+            log "Plex reverse proxy configuration applied - restart required"
+            return 1  # Signal that restart is needed
+        fi
+    fi
+    return 0  # No restart needed
 }
 
 log "Starting scheduled sync job"
@@ -74,7 +96,14 @@ if ! wait_for_containers; then
     exit 1
 fi
 
+# Check and apply Plex reverse proxy configuration if needed
+if ! update_plex_config_for_reverse_proxy; then
+    log "Restarting Plex container to apply reverse proxy configuration..."
+    docker restart rpi_home_plex >/dev/null 2>&1
+    sleep 15  # Give Plex time to restart
+fi
+
 quick_nextcloud_scan
 sleep 2
-jellyfin_library_refresh
+plex_library_refresh
 log "Scheduled sync job completed"

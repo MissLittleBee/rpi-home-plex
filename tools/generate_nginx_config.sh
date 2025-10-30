@@ -93,32 +93,89 @@ server {
         proxy_http_version 1.1;
     }
 
-    # Jellyfin media server - proxy through nginx for VPN compatibility
-    location /jellyfin {
-        return 302 https://\$host/jellyfin/;
+    # Plex Media Server - proxy through nginx for VPN compatibility
+    location /plex {
+        return 302 https://\$host/plex/;
     }
     
-    location /jellyfin/ {
-        proxy_pass http://jellyfin:8096/;
+    location /plex/ {
+        proxy_pass http://plex:32400/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Prefix /jellyfin;
+        proxy_set_header X-Forwarded-Prefix /plex;
+        
+        # Force Plex to treat this as a local connection
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Plex-Client-Platform "Web";
+        proxy_set_header X-Plex-Device-Name "Web Browser";
+        proxy_set_header Referer "";
+        
         proxy_buffering off;
         proxy_read_timeout 3600;
         proxy_connect_timeout 300;
         proxy_send_timeout 300;
+        client_max_body_size 100M;
         
-        # Headers for media streaming
+        # Headers for media streaming and websockets
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection \$connection_upgrade;
         proxy_http_version 1.1;
+        
+        # Plex specific headers
+        proxy_set_header X-Plex-Client-Identifier \$http_x_plex_client_identifier;
+        proxy_set_header X-Plex-Device \$http_x_plex_device;
+        proxy_set_header X-Plex-Device-Name \$http_x_plex_device_name;
+        proxy_set_header X-Plex-Platform \$http_x_plex_platform;
+        proxy_set_header X-Plex-Platform-Version \$http_x_plex_platform_version;
+        proxy_set_header X-Plex-Product \$http_x_plex_product;
+        proxy_set_header X-Plex-Token \$http_x_plex_token;
+        proxy_set_header X-Plex-Version \$http_x_plex_version;
+        proxy_set_header X-Plex-Nocache \$http_x_plex_nocache;
+        proxy_set_header X-Plex-Provides \$http_x_plex_provides;
+        proxy_set_header X-Plex-Device-Vendor \$http_x_plex_device_vendor;
     }
-    
-    location /dlna {
-        return 302 https://\$host/jellyfin/;
+
+    # Plex web assets (CSS, JS, images) - catch assets that don't have /plex/ prefix
+    location ~ ^/(web|library|:/|status|identity|myplex|system|updater|butler)/ {
+        proxy_pass http://plex:32400;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        
+        # Force Plex to treat this as a local connection
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Plex-Client-Platform "Web";
+        proxy_set_header X-Plex-Device-Name "Web Browser";
+        proxy_set_header Referer "";
+        
+        proxy_buffering off;
+        proxy_read_timeout 3600;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        client_max_body_size 100M;
+        
+        # Headers for media streaming and websockets
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_http_version 1.1;
+        
+        # Plex specific headers
+        proxy_set_header X-Plex-Client-Identifier \$http_x_plex_client_identifier;
+        proxy_set_header X-Plex-Device \$http_x_plex_device;
+        proxy_set_header X-Plex-Device-Name \$http_x_plex_device_name;
+        proxy_set_header X-Plex-Platform \$http_x_plex_platform;
+        proxy_set_header X-Plex-Platform-Version \$http_x_plex_platform_version;
+        proxy_set_header X-Plex-Product \$http_x_plex_product;
+        proxy_set_header X-Plex-Token \$http_x_plex_token;
+        proxy_set_header X-Plex-Version \$http_x_plex_version;
+        proxy_set_header X-Plex-Nocache \$http_x_plex_nocache;
+        proxy_set_header X-Plex-Provides \$http_x_plex_provides;
+        proxy_set_header X-Plex-Device-Vendor \$http_x_plex_device_vendor;
     }
 
     # Webshare Search service

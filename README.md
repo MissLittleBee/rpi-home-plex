@@ -19,7 +19,7 @@ This project provides a **fully automated, zero-configuration** home server stac
 - **🔒 Nginx Reverse Proxy** - SSL-terminated proxy with dynamic configuration and mobile app support
 - **☁️ Nextcloud** - Self-hosted file sharing and collaboration platform with multi-directory support (Videos, Images, Documents)
 - **🏡 Home Assistant** - Home automation and IoT device management platform
-- **🎬 Jellyfin** - Media server for streaming videos and photos with multi-library support
+- **🎬 Plex Media Server** - Professional media server with optimized reverse proxy configuration for local network detection
 - **🔍 Webshare Search** - English web interface for searching and downloading from webshare.cz with real-time progress tracking
 - **🗄️ MariaDB** - Database backend for Nextcloud
 - **🔄 Automated Maintenance** - Scheduled sync (every 10 minutes) and Docker cleanup (every 6 hours)
@@ -30,7 +30,7 @@ This project provides a **fully automated, zero-configuration** home server stac
 Internet → Nginx (SSL) → Internal Services
                 ├── Nextcloud (/nextcloud) ←──┐
                 ├── Home Assistant (/)        │ Auto-Sync
-                ├── Jellyfin (/jellyfin) ←────┘ (Every 10min)
+                ├── Plex Media Server (/plex) ←┘ (Every 10min)
                 └── Webshare Search (/ws)
 ```
 
@@ -40,9 +40,9 @@ Internet → Nginx (SSL) → Internal Services
 - **Shared Access**: All services access storage with proper `media` group permissions (GID 1001)
 - **Automatic Permissions**: setgid directories ensure new files get correct group ownership
 - **Scheduled Maintenance**: Permission fixes every 6 hours via automated cleanup
-- **Multi-Library Support**: Jellyfin serves both video and photo libraries
+- **Multi-Library Support**: Plex serves both video and photo libraries with automatic metadata
 - **Progress Tracking**: Real-time download progress bars with English interface
-- **Cross-Platform Visibility**: Files automatically visible in Nextcloud, Jellyfin, and mobile apps
+- **Cross-Platform Visibility**: Files automatically visible in Nextcloud, Plex, and mobile apps
 
 ## 🚀 Quick Start
 
@@ -83,6 +83,7 @@ During setup, you'll be asked for:
 - **Server IP Address** (auto-detected)
 - **VPN IP Address** (optional, for VPN access)
 - **Webshare.cz Credentials** (username and password)
+- **Plex Claim Token** (optional, from https://www.plex.tv/claim/ - automatically removed after setup for security)
 - **Storage Directory Paths**:
   - Video directory (default: `/home/user/videos`)
   - Image directory (default: `/home/user/images`)
@@ -93,8 +94,15 @@ During setup, you'll be asked for:
 ### 4. Reconfigure Anytime
 
 ```bash
+# Quick restart (preserves configuration)
+./home_stop.sh && ./home_start.sh
+
 # Change configuration
 ./home_start.sh --reconfigure
+
+# Fresh setup (remove config)
+./home_stop.sh  # Choose config removal
+./home_start.sh
 
 # Validate current config
 ./tools/validate_config.sh
@@ -105,7 +113,9 @@ During setup, you'll be asked for:
 Services will be available at your configured hostname/IP:
 - **Home Assistant**: `https://[your-hostname]/`
 - **Nextcloud**: `https://[your-hostname]/nextcloud/`
-- **Jellyfin**: `https://[your-hostname]/jellyfin/`
+- **Plex Media Server**: 
+  - **Web Browser**: `https://[your-hostname]/plex/` (optimized for local network detection)
+  - **Apps & Devices**: `http://[server-ip]:32400` (direct access for mobile apps, smart TVs)
 - **Webshare Search**: `https://[your-hostname]/ws/`
 
 All services are automatically configured with proper authentication and media library synchronization.
@@ -136,7 +146,7 @@ rpi_home/
 │   │   ├── config/            # HA configuration files (tracked in Git)
 │   │   └── data/              # HA runtime data (ignored)
 │   ├── nextcloud/             # Nextcloud data (ignored)
-│   ├── jellyfin/              # Jellyfin data (ignored)
+│   ├── plex/                  # Plex data (ignored)
 │   └── webshare/              # Webshare search application
 ├── logs/                      # 📄 Application logs
 └── README.md                  # 📖 This documentation
@@ -171,7 +181,7 @@ rpi_home/
 **🔄 Sync Management**
 
 ```bash
-# Manual sync (triggers immediate Nextcloud + Jellyfin refresh)
+# Manual sync (triggers immediate Nextcloud + Plex refresh)
 ./tools/scheduled-sync.sh
 
 # Check sync logs
@@ -212,8 +222,25 @@ tail -f logs/scheduled-cleanup.log
 
 The `./home_stop.sh` script provides detailed explanations of what will be cleaned when you choose cleanup options:
 
+### Quick Restart Workflow
+
+```bash
+# Quick restart (preserves all configuration)
+./home_stop.sh        # Choose "N" to keep config files
+./home_start.sh       # Uses existing configuration, skips interactive setup
+
+# Fresh setup (reconfigure everything)  
+./home_stop.sh        # Choose "Y" to remove config files
+./home_start.sh       # Runs full interactive setup
+
+# Reconfigure without stopping
+./home_start.sh --reconfigure
+```
+
+**Restart Options:**
 - **Docker Resource Cleanup**: Removes unused networks, dangling images, build cache, and stopped containers while preserving your data and running services
-- **Sync Cleanup**: Removes cron jobs while preserving sync scripts, logs, and media files
+- **Configuration Cleanup**: Option to remove config files for fresh setup or preserve for quick restart
+- **Automation Cleanup**: Option to remove cron jobs while preserving sync scripts, logs, and media files
 
 ## ⚙️ Configuration
 
@@ -237,6 +264,9 @@ VPN_IP=10.10.20.1
 # Webshare.cz Configuration  
 WEBSHARE_USERNAME=your_username
 WEBSHARE_PASSWORD=your_password
+
+# Plex Configuration
+PLEX_CLAIM_TOKEN=claim-xxxxxxxxxxxx
 
 # Storage Configuration
 VIDEO_PATH=/path/to/your/videos
@@ -275,23 +305,27 @@ Runtime data in `volumes/homeassistant/data/` is excluded from Git.
 
 ### Nextcloud
 
-**Fully Automated Setup**: Nextcloud skips the setup wizard entirely! 
+**Manual Setup Required**: For better control and reliability, Nextcloud uses manual setup through web interface.
 
-🚀 **Fresh Installation Behavior:**
+🚀 **Fresh Installation Process:**
 1. Access https://[your-hostname]/nextcloud/
-2. **No setup wizard** - goes directly to login screen
-3. **Admin account pre-created** with your chosen username and password
-4. **Database automatically configured** (MariaDB backend)
+2. **Create admin account** with your preferred username and password
+3. **Database configuration** (automatically provided):
+   - Database & user: `nextcloud`
+   - Database password: Available in `secrets/db_password` file
+   - Database host: `db`
+   - Leave other fields as default
+4. Click 'Finish setup'
 5. **Media library ready** at the correct user path
 
 **What's Pre-Configured:**
-- ✅ Admin account: Uses your `NEXTCLOUD_USER` and `NEXTCLOUD_PASSWORD`
-- ✅ Database: Automatically connects to MariaDB with generated secrets
+- ✅ Database connection: MariaDB backend with auto-generated secure passwords
 - ✅ Trusted domains: Pre-configured for your `HOSTNAME`
-- ✅ Media mount: `- **Storage mounts**: Videos, Images, and Documents directories correctly mapped` correctly mapped
+- ✅ Storage mounts: Videos, Images, and Documents directories correctly mapped
 - ✅ Reverse proxy: Ready for `/nextcloud/` path access
+- ✅ SSL termination: Handled by nginx reverse proxy
 
-**First Access**: Simply login with the credentials you set during `./home_start.sh`!
+**Setup Instructions**: Detailed database credentials and setup steps provided in deployment output.
 
 **⚠️ Important**: This auto-setup only works on **first deployment**. If you already have Nextcloud data, you'll need to use existing credentials.
 
@@ -303,9 +337,15 @@ sudo rm -rf volumes/nextcloud/
 ./home_start.sh  # Will trigger fresh auto-setup
 ```
 
-### 🎬 Jellyfin & Media Libraries
+### 🎬 Plex Media Server & Local Network Optimization
 
 Media files are organized in separate directories with automated management:
+
+**Dual Access Configuration:**
+- **Reverse Proxy Web Access**: `https://[hostname]/plex/` - Optimized for local network detection with special headers
+- **Direct Device Access**: `http://[server-ip]:32400` - For mobile apps, smart TVs, game consoles with auto-discovery
+- **Local Network Recognition**: Reverse proxy connections treated as local for full streaming quality
+- **Automatic Device Discovery**: DLNA and GDM ports exposed for seamless device connection
 
 **Multi-Library Setup:**
 - **Video Library**: `{VIDEO_PATH}` - Movies, TV shows, and video content
@@ -315,13 +355,14 @@ Media files are organized in separate directories with automated management:
 **Permission System:**
 - **Media Group**: All services use shared `media` group (GID 1001)
 - **Automatic Ownership**: New files inherit correct group via setgid directories
-- **Cross-Service Access**: Webshare downloads → Jellyfin indexing → Nextcloud visibility
+- **Cross-Service Access**: Webshare downloads → Plex indexing → Nextcloud visibility
 
 **Auto-Sync Features:**
 - ✅ Libraries sync every 10 minutes automatically
 - ✅ Permission fixes every 6 hours via scheduled cleanup
 - ✅ New downloads appear across all services
 - ✅ Renamed files are detected and updated
+- ✅ Automatic metadata fetching and library organization
 - ✅ Survives system reboots with cron automation
 
 **🔍 Webshare Search Application
@@ -359,7 +400,7 @@ Advanced web interface for webshare.cz API integration with comprehensive real-t
    ```
 2. Application auto-authenticates using environment variables
 2. Downloads save directly to `$VIDEO_PATH` with correct media group permissions
-4. Files automatically appear in Nextcloud and Jellyfin within 10 minutes via scheduled sync
+4. Files automatically appear in Nextcloud and Plex within 10 minutes via scheduled sync
 
 ### SSL Certificates
 
@@ -374,7 +415,7 @@ Self-signed certificates are generated automatically. For production use:
 
 - **80/443** - Nginx (HTTP/HTTPS reverse proxy)
 - **8123** - Home Assistant (direct access, also available via proxy at /)
-- **8096** - Jellyfin (direct access, also available via proxy at /jellyfin/)
+- **32400** - Plex Media Server (direct access, also available via proxy at /plex/)
 - **5000** - Webshare Search (direct access, also available via proxy at /ws/)
 
 ### DNS
@@ -389,7 +430,7 @@ Add to `/etc/hosts` or configure local DNS:
 For VPN access without local DNS, use IP addresses directly:
 - **Home Assistant**: https://10.10.20.1/
 - **Nextcloud**: https://10.10.20.1/nextcloud/
-- **Jellyfin**: https://10.10.20.1/jellyfin/
+- **Plex Media Server**: https://10.10.20.1/plex/
 - **Webshare Search**: https://10.10.20.1/ws/
 
 ## 🔐 Security
@@ -424,7 +465,7 @@ tail -f logs/scheduled-sync.log
 Access service status pages:
 - **Home Assistant**: System → Info
 - **Nextcloud**: Settings → Administration → System  
-- **Jellyfin**: https://ha.local/jellyfin/ → Dashboard → System
+- **Plex Media Server**: https://ha.local/plex/ → Settings → General
 - **Webshare**: http://ha.local:5000/health (API endpoint)
 
 ### 🔄 Auto-Sync Monitoring
@@ -483,7 +524,7 @@ systemctl status cron
 ./tools/scheduled-sync.sh
 
 # Check for container readiness
-docker ps | grep -E "(nextcloud|jellyfin)"
+docker ps | grep -E "(nextcloud|plex)"
 
 # View sync error logs
 tail -20 logs/scheduled-sync.log
@@ -502,7 +543,7 @@ tail -20 logs/scheduled-cleanup.log
 
 # Force service refresh
 docker compose -f tools/docker-compose.yml restart app
-docker compose -f tools/docker-compose.yml restart jellyfin
+docker compose -f tools/docker-compose.yml restart plex
 ```
 
 **Character encoding issues:**
@@ -536,7 +577,7 @@ docker system prune -a --volumes
 2. **Data directories** (backup separately):
    - `volumes/nextcloud/` (user files and database)
    - `volumes/homeassistant/data/` (runtime data)
-   - `volumes/jellyfin/` (metadata and configuration)
+   - `volumes/plex/` (metadata and configuration)
    - `$VIDEO_PATH` (video library)
    - `$IMAGE_PATH` (photo library)
    - `$DOC_PATH` (document storage)

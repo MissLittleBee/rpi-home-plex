@@ -16,7 +16,7 @@ stack_exists() {
 
 # Show current image versions
 echo "Current image versions:"
-docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep -E "(nginx|mariadb|nextcloud|home-assistant|jellyfin|webshare)" || echo "No relevant images found"
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep -E "(nginx|mariadb|nextcloud|home-assistant|plex|webshare)" || echo "No relevant images found"
 echo ""
 
 # Ask for confirmation
@@ -43,8 +43,8 @@ docker pull nextcloud:stable
 echo "Pulling ghcr.io/home-assistant/home-assistant:stable..."
 docker pull ghcr.io/home-assistant/home-assistant:stable
 
-echo "Pulling linuxserver/jellyfin:latest..."
-docker pull linuxserver/jellyfin:latest
+echo "Pulling linuxserver/plex:latest..."
+docker pull linuxserver/plex:latest
 
 echo "Building webshare-search service..."
 docker build -f tools/Dockerfile.webshare -t rpi_home_webshare-search .
@@ -111,7 +111,7 @@ fi
 echo ""
 echo "=== Update Complete! ==="
 echo "New image versions:"
-docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep -E "(nginx|mariadb|nextcloud|home-assistant|jellyfin|webshare)" || echo "No relevant images found"
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | grep -E "(nginx|mariadb|nextcloud|home-assistant|plex|webshare)" || echo "No relevant images found"
 
 # Refresh storage permissions and trigger sync after update
 echo "Refreshing storage permissions and libraries..."
@@ -144,7 +144,7 @@ fi
 echo "📁 Access your services:"
 echo "  • Home Assistant: https://${HOSTNAME}/"
 echo "  • Nextcloud: https://${HOSTNAME}/nextcloud/"
-echo "  • Jellyfin: https://${HOSTNAME}/jellyfin/"
+echo "  • Plex Media Server: https://${HOSTNAME}/plex/"
 echo "  • Webshare Search: https://${HOSTNAME}/ws/ (or http://${HOSTNAME}:5000/)"
 echo ""
 echo "🔄 Automation status:"

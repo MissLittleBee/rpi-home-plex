@@ -5,7 +5,7 @@ volumes/homeassistant/data/
 volumes/homeassistant/config/*
 !volumes/homeassistant/config/*.yaml
 
-volumes/jellyfin/
+volumes/plex/
 
 volumes/nextcloud/
 

@@ -92,7 +92,7 @@ echo ""
 echo "🔗 Service URLs:"
 echo "  Home Assistant: https://${HOSTNAME}/"
 echo "  Nextcloud: https://${HOSTNAME}/nextcloud/"  
-echo "  Jellyfin: https://${HOSTNAME}/jellyfin/"
+echo "  Plex Media Server: https://${HOSTNAME}/plex/"
 echo "  Webshare Search: https://${HOSTNAME}/ws/"
 echo ""
 
