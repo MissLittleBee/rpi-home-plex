@@ -89,7 +89,23 @@ services:
     volumes:
       - ../volumes/homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    devices:
+      - /dev/ttyAMA0:/dev/ttyAMA0
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
 EOF
+
+# Add Bluetooth devices
+echo "      # Bluetooth devices for Home Assistant" >> "$SCRIPT_DIR/docker-compose.yml"
+if [ -e "/dev/serial1" ]; then
+    echo "      - /dev/serial1:/dev/serial1" >> "$SCRIPT_DIR/docker-compose.yml"
+fi
+if [ -e "/dev/ttyS0" ]; then
+    echo "      - /dev/ttyS0:/dev/ttyS0" >> "$SCRIPT_DIR/docker-compose.yml"
+fi
 
 # Add USB devices if specified
 if [ -n "$USB_DEVICES" ]; then
@@ -125,12 +141,10 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
       - TZ=${TIMEZONE}
       - ENABLE_IPV6=false
     restart: unless-stopped
+    privileged: true
 EOF
 
-# Add privileged mode if USB devices are present
-if [ -n "$USB_DEVICES" ]; then
-    echo "    privileged: true" >> "$SCRIPT_DIR/docker-compose.yml"
-fi
+# Note: privileged mode is always enabled for Bluetooth and other hardware access
 
 # Continue with remaining services
 cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
@@ -219,6 +233,9 @@ echo "  • Image path: ${IMAGE_PATH}"
 echo "  • Document path: ${DOC_PATH}"
 echo "  • Nextcloud user: ${NEXTCLOUD_USER}"
 echo "  • Timezone: ${TIMEZONE}"
+
+# Report Bluetooth support
+echo "  • Bluetooth support: ✅ Enabled with hardware access"
 
 # Report USB devices
 if [ -n "$USB_DEVICES" ]; then
