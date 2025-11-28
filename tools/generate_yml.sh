@@ -92,13 +92,9 @@ services:
       - /run/dbus:/run/dbus:ro
     devices:
       - /dev/ttyAMA0:/dev/ttyAMA0
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-      - SYS_ADMIN
 EOF
 
-# Add Bluetooth devices
+# Add Bluetooth devices (Nyní se přidává pod devices: se správným odsazením)
 echo "      # Bluetooth devices for Home Assistant" >> "$SCRIPT_DIR/docker-compose.yml"
 if [ -e "/dev/serial1" ]; then
     echo "      - /dev/serial1:/dev/serial1" >> "$SCRIPT_DIR/docker-compose.yml"
@@ -107,7 +103,7 @@ if [ -e "/dev/ttyS0" ]; then
     echo "      - /dev/ttyS0:/dev/ttyS0" >> "$SCRIPT_DIR/docker-compose.yml"
 fi
 
-# Add USB devices if specified
+# Add USB devices if specified (Nyní se přidává pod devices: se správným odsazením)
 if [ -n "$USB_DEVICES" ]; then
     echo "      # USB Serial devices for Home Assistant" >> "$SCRIPT_DIR/docker-compose.yml"
     IFS='|' read -ra DEVICES <<< "$USB_DEVICES"
@@ -135,6 +131,10 @@ fi
 
 # Continue with the rest of the Home Assistant service
 cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
     env_file:
       - .env
     environment:
@@ -152,17 +152,6 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
   plex:
     image: linuxserver/plex
     container_name: rpi_home_plex
-    ports:
-      - "32400:32400/tcp"  # Web interface
-      - "1900:1900/udp"    # DLNA
-      - "3005:3005/tcp"    # Plex Companion
-      - "5353:5353/udp"    # Bonjour/Avahi
-      - "8324:8324/tcp"    # Roku via Plex Companion
-      - "32410:32410/udp"  # GDM network discovery
-      - "32412:32412/udp"  # GDM network discovery
-      - "32413:32413/udp"  # GDM network discovery
-      - "32414:32414/udp"  # GDM network discovery
-      - "32469:32469/tcp"  # Plex DLNA Server
     volumes:
       - ../volumes/plex/config:/config
       - ../volumes/plex/transcode:/transcode
@@ -185,8 +174,7 @@ fi
 
 # Continue with Plex service and add comments for local network configuration
 cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
-    networks:
-      - internal
+    network_mode: host
     restart: unless-stopped
     # Note: Plex is configured for both direct access (ports) and reverse proxy (internal network)
     # Direct access: http://SERVER_IP:32400 for devices

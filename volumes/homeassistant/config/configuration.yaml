@@ -1,9 +1,6 @@
 # Loads default set of integrations. Do not remove.
 default_config:
 
-# Bluetooth integration
-bluetooth:
-
 # HTTP integration configuration for reverse proxy
 http:
   use_x_forwarded_for: true
