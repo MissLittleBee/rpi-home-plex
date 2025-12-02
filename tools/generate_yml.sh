@@ -94,7 +94,7 @@ services:
       - /dev/ttyAMA0:/dev/ttyAMA0
 EOF
 
-# Add Bluetooth devices (Nyní se přidává pod devices: se správným odsazením)
+# Add Bluetooth devices
 echo "      # Bluetooth devices for Home Assistant" >> "$SCRIPT_DIR/docker-compose.yml"
 if [ -e "/dev/serial1" ]; then
     echo "      - /dev/serial1:/dev/serial1" >> "$SCRIPT_DIR/docker-compose.yml"
@@ -103,7 +103,7 @@ if [ -e "/dev/ttyS0" ]; then
     echo "      - /dev/ttyS0:/dev/ttyS0" >> "$SCRIPT_DIR/docker-compose.yml"
 fi
 
-# Add USB devices if specified (Nyní se přidává pod devices: se správným odsazením)
+# Add USB devices if specified
 if [ -n "$USB_DEVICES" ]; then
     echo "      # USB Serial devices for Home Assistant" >> "$SCRIPT_DIR/docker-compose.yml"
     IFS='|' read -ra DEVICES <<< "$USB_DEVICES"
