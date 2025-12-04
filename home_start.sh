@@ -727,7 +727,7 @@ echo "Waiting for services to stabilize before setting up automation..."
 sleep 30
 
 # Verify services are running before setting up automation
-STABLE_SERVICES=$(docker compose -f tools/docker-compose.yml ps --format json | jq -r '.State' | grep -c "running" || echo "0")
+STABLE_SERVICES=$(docker ps --filter "status=running" | grep -c "Up")
 
 if [ "$STABLE_SERVICES" -ge 6 ]; then  # All 6 services should be running (nginx, db, nextcloud, homeassistant, plex, webshare)
     echo "✓ Services are stable - setting up automation systems"

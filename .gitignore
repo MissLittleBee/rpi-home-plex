@@ -4,6 +4,11 @@
 volumes/homeassistant/data/
 volumes/homeassistant/config/*
 !volumes/homeassistant/config/*.yaml
+volumes/homeassistant/config/secrets.yaml
+volumes/homeassistant/data/
+volumes/homeassistant/config/*.db
+volumes/homeassistant/config/*.log
+volumes/homeassistant/config/configuration.yaml
 
 volumes/plex/
 

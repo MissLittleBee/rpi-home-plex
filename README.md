@@ -617,6 +617,33 @@ crontab crontab_backup.txt
 tail -f logs/scheduled-sync.log
 ```
 
+### Cron Example: Automated Backups
+
+Use the included helper to install a daily cron job that runs the repository backup.
+
+Install (for the current user):
+
+```bash
+# Make the installer executable and run it (no sudo required for user crontab)
+chmod +x tools/install_backup_cron.sh
+./tools/install_backup_cron.sh
+
+# Verify the installed cron
+crontab -l
+```
+
+Manual crontab entry (example — runs backup daily at 03:00):
+
+```cron
+0 3 * * * /full/path/to/rpi-home-plex/tools/backup_config.sh >> /full/path/to/rpi-home-plex/logs/backup.log 2>&1
+```
+
+Notes:
+- The installer avoids duplicate entries and preserves existing cron jobs.
+- Backups are stored in `home/server_config_backup/` inside the project and rotated (default keep: 14).
+- Adjust schedule or retention by editing `tools/install_backup_cron.sh` or setting `KEEP_COUNT` environment variable when running the backup script.
+
+
 ## 🏷️ Version Requirements
 
 - **Docker**: 20.10+
