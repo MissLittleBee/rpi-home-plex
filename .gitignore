@@ -1,9 +1,15 @@
 # Recommended .gitignore for your Docker Swarm Home Assistant & Nextcloud setup
 
-# volumes
+# All volumes and personal data
 volumes/
 
-# Ignore NGINX config
+# Backups (may contain sensitive config)
+backup/
+
+# Logs
+logs/
+
+# Ignore NGINX config and certificates
 nginx/
 
 # Ignore sensitive config files
