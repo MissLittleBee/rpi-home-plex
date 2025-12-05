@@ -747,6 +747,8 @@ if [ "$STABLE_SERVICES" -ge 6 ]; then  # All 6 services should be running (nginx
 */10 * * * * ${CURRENT_DIR}/tools/scheduled-sync.sh
 @reboot sleep 360 && ${CURRENT_DIR}/tools/scheduled-cleanup.sh
 0 */6 * * * ${CURRENT_DIR}/tools/scheduled-cleanup.sh
+@reboot sleep 300 && ${CURRENT_DIR}/tools/scheduled-backup.sh
+0 2 * * * ${CURRENT_DIR}/tools/scheduled-backup.sh
 CRONEOF
         
         echo "✓ Auto-sync cron jobs configured (every 10 minutes + on reboot)"

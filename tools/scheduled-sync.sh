@@ -46,7 +46,7 @@ quick_nextcloud_scan() {
     local container_id=$(get_nextcloud_container)
     if [ -n "$container_id" ]; then
         log "Running quick Nextcloud sync..."
-        docker exec -u www-data "$container_id" php /var/www/html/occ files:scan --shallow jeyjey 2>/dev/null
+        docker exec -u www-data "$container_id" php /var/www/html/occ files:scan --shallow 2>/dev/null
         log "Nextcloud quick sync completed"
     else
         log "ERROR: Nextcloud container not found"

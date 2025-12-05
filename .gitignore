@@ -1,18 +1,7 @@
 # Recommended .gitignore for your Docker Swarm Home Assistant & Nextcloud setup
 
-# Ignore Home Assistant and Nextcloud persistent/config/data
-volumes/homeassistant/data/
-volumes/homeassistant/config/*
-!volumes/homeassistant/config/*.yaml
-volumes/homeassistant/config/secrets.yaml
-volumes/homeassistant/data/
-volumes/homeassistant/config/*.db
-volumes/homeassistant/config/*.log
-volumes/homeassistant/config/configuration.yaml
-
-volumes/plex/
-
-volumes/nextcloud/
+# volumes
+volumes/
 
 # Ignore NGINX config
 nginx/
