@@ -759,6 +759,4 @@ tail -20 logs/scheduled-sync.log
 ```
 
 ---
-
-**⚡ Built for reliable home server hosting with Docker Swarm**  
 **🔧 Zero-configuration deployment with full customization support**
