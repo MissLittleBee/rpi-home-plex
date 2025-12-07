@@ -55,14 +55,23 @@ quick_nextcloud_scan() {
 
 # Plex library refresh (non-disruptive)
 plex_library_refresh() {
-    local container_id=$(docker ps --format "table {{.ID}}\t{{.Image}}" | grep "plex" | awk '{print $1}' | head -1)
-    if [ -n "$container_id" ]; then
-        log "Refreshing Plex library..."
-        # Trigger a library scan for all sections using Plex Media Scanner
-        docker exec "$container_id" /usr/lib/plexmediaserver/Plex\ Media\ Scanner --scan &>/dev/null
-        log "Plex library refresh triggered"
+    local plex_token="${PLEX_TOKEN:-}"
+    if [ -z "$plex_token" ]; then
+        log "WARNING: PLEX_TOKEN not set, skipping Plex library refresh"
+        return
+    fi
+    
+    log "Refreshing Plex library..."
+    # Get all library sections and trigger refresh for each
+    local sections=$(curl -s "http://localhost:32400/library/sections?X-Plex-Token=${plex_token}" | grep -oP 'key="\K[0-9]+' || echo "")
+    
+    if [ -n "$sections" ]; then
+        for section in $sections; do
+            curl -s "http://localhost:32400/library/sections/${section}/refresh?X-Plex-Token=${plex_token}" > /dev/null 2>&1
+        done
+        log "Plex library refresh triggered for all sections"
     else
-        log "ERROR: Plex container not found"
+        log "WARNING: No Plex library sections found or unable to connect"
     fi
 }
 
