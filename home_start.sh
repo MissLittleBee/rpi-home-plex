@@ -250,6 +250,13 @@ setup_configuration() {
     read -p "Video directory path [/home/$CURRENT_USER/videos]: " VIDEO_PATH
     VIDEO_PATH=${VIDEO_PATH:-/home/$CURRENT_USER/videos}
     
+    echo "  📁 Movies and series will be organized into subdirectories:"
+    read -p "  Movies directory path [$VIDEO_PATH/movies]: " MOVIES_PATH
+    MOVIES_PATH=${MOVIES_PATH:-$VIDEO_PATH/movies}
+    
+    read -p "  Series directory path [$VIDEO_PATH/series]: " SERIES_PATH
+    SERIES_PATH=${SERIES_PATH:-$VIDEO_PATH/series}
+    
     read -p "Image directory path [/home/$CURRENT_USER/images]: " IMAGE_PATH
     IMAGE_PATH=${IMAGE_PATH:-/home/$CURRENT_USER/images}
     
@@ -290,6 +297,8 @@ setup_configuration() {
     echo "  VPN IP: $VPN_IP"
     echo "  Webshare Username: $WEBSHARE_USERNAME"
     echo "  Video Path: $VIDEO_PATH"
+    echo "  Movies Path: ${MOVIES_PATH:-$VIDEO_PATH/movies}"
+    echo "  Series Path: ${SERIES_PATH:-$VIDEO_PATH/series}"
     echo "  Image Path: $IMAGE_PATH"
     echo "  Document Path: $DOC_PATH"
     echo "  Nextcloud User: $NEXTCLOUD_USER"
@@ -322,6 +331,8 @@ PLEX_CLAIM_TOKEN=$PLEX_CLAIM_TOKEN
 
 # Storage Configuration
 VIDEO_PATH=$VIDEO_PATH
+MOVIES_PATH=${MOVIES_PATH:-$VIDEO_PATH/movies}
+SERIES_PATH=${SERIES_PATH:-$VIDEO_PATH/series}
 IMAGE_PATH=$IMAGE_PATH
 DOC_PATH=$DOC_PATH
 
@@ -625,6 +636,24 @@ setup_storage_permissions() {
     
     # Setup all storage directories
     setup_directory_permissions "$DETECTED_VIDEO_PATH" "video"
+    
+    # Create and setup movies and series subdirectories
+    MOVIES_DIR="${DETECTED_VIDEO_PATH}/movies"
+    SERIES_DIR="${DETECTED_VIDEO_PATH}/series"
+    
+    if [ ! -d "$MOVIES_DIR" ]; then
+        echo "Creating movies directory: $MOVIES_DIR"
+        mkdir -p "$MOVIES_DIR"
+    fi
+    
+    if [ ! -d "$SERIES_DIR" ]; then
+        echo "Creating series directory: $SERIES_DIR"
+        mkdir -p "$SERIES_DIR"
+    fi
+    
+    setup_directory_permissions "$MOVIES_DIR" "movies"
+    setup_directory_permissions "$SERIES_DIR" "series"
+    
     setup_directory_permissions "$DETECTED_IMAGE_PATH" "image" 
     setup_directory_permissions "$DETECTED_DOC_PATH" "document"
     
@@ -644,6 +673,8 @@ setup_storage_permissions() {
     export MEDIA_GID
     export HOST_UID="$CURRENT_UID"
     export VIDEO_PATH="$DETECTED_VIDEO_PATH"
+    export MOVIES_PATH="${DETECTED_VIDEO_PATH}/movies"
+    export SERIES_PATH="${DETECTED_VIDEO_PATH}/series"
     export IMAGE_PATH="$DETECTED_IMAGE_PATH" 
     export DOC_PATH="$DETECTED_DOC_PATH"
     
@@ -651,6 +682,8 @@ setup_storage_permissions() {
     echo "  MEDIA_GID=$MEDIA_GID"
     echo "  HOST_UID=$CURRENT_UID"
     echo "  VIDEO_PATH=$DETECTED_VIDEO_PATH"
+    echo "  MOVIES_PATH=${DETECTED_VIDEO_PATH}/movies"
+    echo "  SERIES_PATH=${DETECTED_VIDEO_PATH}/series"
     echo "  IMAGE_PATH=$DETECTED_IMAGE_PATH"
     echo "  DOC_PATH=$DETECTED_DOC_PATH"
     
@@ -871,8 +904,9 @@ echo "  5. Add library: TV Shows -> Browse for folder -> /media/videos"
 echo ""
 echo "⚠️  Common Issues:"
 echo "  • Downloaded files not visible in Nextcloud/Plex: Run ./tools/scheduled-cleanup.sh cleanup"
-echo "  • Plex shows 'Remote Access' in web browser: This is normal for reverse proxy, streaming still works"
-echo "  • Webshare 'File temporarily unavailable': This is from webshare.cz servers,"
+echo "  • Downloaded files not visible in Nextcloud/Plex: Check if all paths are correctly set and accessible."
+echo "  • Plex shows 'Remote Access' in web browser: Check status of network, use hostname network for detection server as local."
+echo "  • Webshare 'File temporarily unavailable': This is caused by webshare.cz servers,"
 echo "    not our application. Try again later or choose a different file."
-echo "  • SSL certificate warnings: Expected for self-signed certificates"
+echo "  • SSL certificate warnings: Expected for self-signed certificates, mobile apps may warn, if it possible and safe go over this warning"
 echo "  • Services starting slowly: Give containers 1-2 minutes to fully initialize"
