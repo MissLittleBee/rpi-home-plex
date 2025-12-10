@@ -12,8 +12,9 @@ This project provides a **fully automated, zero-configuration** home server stac
 - **📁 Multi-Path Storage** - Separate directories for Videos, Images, and Documents
 - **� Shared Permission System** - Media group ensures cross-service file access
 - **📱 Mobile App Support** - Optimized nginx configuration for Nextcloud mobile apps
-- **🔄 Unified Automation** - Sync every 10min, cleanup every 6h, both via cron
-- **🔒 Security Built-In** - SSL certificates, secrets management, reverse proxy
+- **🔄 Unified Automation** - Sync every 10min, cleanup every 6h, backups daily at 2 AM via cron
+- **🔒 Security Built-In** - SSL certificates, secrets management, reverse proxy, sensitive configs excluded from git
+- **📱 Mobile App Ready** - Certificate installation guide for secure mobile access
 
 **📦 Included Services:**
 - **🔒 Nginx Reverse Proxy** - SSL-terminated proxy with dynamic configuration and mobile app support
@@ -22,7 +23,7 @@ This project provides a **fully automated, zero-configuration** home server stac
 - **🎬 Plex Media Server** - Professional media server with optimized reverse proxy configuration for local network detection
 - **🔍 Webshare Search** - English web interface for searching and downloading from webshare.cz with real-time progress tracking
 - **🗄️ MariaDB** - Database backend for Nextcloud
-- **🔄 Automated Maintenance** - Scheduled sync (every 10 minutes) and Docker cleanup (every 6 hours)
+- **🔄 Automated Maintenance** - Scheduled sync (every 10 minutes), Docker cleanup (every 6 hours), and config backups (daily at 2 AM)
 
 ## 🏗️ Architecture
 
@@ -133,6 +134,7 @@ rpi_home/
 │   ├── Dockerfile.webshare    # Webshare app container build
 │   ├── scheduled-sync.sh      # Efficient sync script (runs every 10min)
 │   ├── scheduled-cleanup.sh   # Automated cleanup and permission fixes (runs every 6h)
+│   ├── scheduled-backup.sh    # Configuration backup script (runs daily at 2 AM)
 │   ├── create_ssl.sh          # SSL certificate generator
 │   ├── fix_homeassistant.sh   # Home Assistant configuration fixes
 │   ├── generate_nginx_config.sh # Dynamic nginx config generator (with backup)
@@ -143,12 +145,13 @@ rpi_home/
 │   └── cert/                  # SSL certificates (auto-generated)
 ├── volumes/
 │   ├── homeassistant/
-│   │   ├── config/            # HA configuration files (tracked in Git)
+│   │   ├── config/            # HA configuration files (excluded from git for privacy)
 │   │   └── data/              # HA runtime data (ignored)
 │   ├── nextcloud/             # Nextcloud data (ignored)
 │   ├── plex/                  # Plex data (ignored)
 │   └── webshare/              # Webshare search application
-├── logs/                      # 📄 Application logs
+├── backup/                    # 📦 Automated config backups (daily 2 AM, excluded from git)
+├── logs/                      # 📄 Application logs (excluded from git)
 └── README.md                  # 📖 This documentation
 ```
 
@@ -196,6 +199,28 @@ crontab -l
 
 **Scheduled sync runs automatically every 10 minutes and after system reboot.**
 Initial sync is triggered automatically during deployment. Uses efficient API-based approach with minimal resource usage.
+
+**🔄 Backup Management**
+
+```bash
+# Manual backup (saves all configs to backup/ directory)
+./tools/scheduled-backup.sh
+
+# Check backup logs
+tail -f logs/scheduled-backup.log
+
+# View backups
+ls -lh backup/
+```
+
+**Scheduled backups run automatically daily at 2:00 AM** via cron. Includes:
+- Home Assistant config (YAML files, custom components, blueprints)
+- Nextcloud config (PHP config files)
+- Nginx config (reverse proxy settings)
+- Docker config (docker-compose.yml, .env, all scripts)
+- Network config (interfaces, routes, current state)
+
+Old backups are automatically cleaned up (keeps last 7 days).
 
 ### Automated Maintenance System
 
@@ -295,13 +320,16 @@ cat tools/.env
 
 ### Home Assistant
 
-Configuration files are stored in `volumes/homeassistant/config/` and tracked in Git:
+Configuration files are stored in `volumes/homeassistant/config/`:
 - `configuration.yaml` - Main configuration
 - `automations.yaml` - Automation rules
 - `scripts.yaml` - Custom scripts
 - `scenes.yaml` - Scene definitions
+- `secrets.yaml` - Sensitive credentials
 
-Runtime data in `volumes/homeassistant/data/` is excluded from Git.
+**Privacy Note:** Home Assistant configs are **excluded from git** (`.gitignore`) to protect personal data. Use `scheduled-backup.sh` for local backups.
+
+Runtime data in `volumes/homeassistant/data/` is also excluded.
 
 ### Nextcloud
 
@@ -484,7 +512,9 @@ Advanced web interface for webshare.cz API integration with comprehensive real-t
 
 ### SSL Certificates
 
-Self-signed certificates are generated automatically. For production use:
+Self-signed certificates are generated automatically during setup.
+
+**For Production:**
 1. Obtain certificates from Let's Encrypt or CA
 2. Replace files in `nginx/cert/`
 3. Update `nginx/conf.d/default.conf` if needed
@@ -645,42 +675,72 @@ docker system prune -a --volumes
 
 ## 🔄 Backup Strategy
 
-### What to Backup
+### Automated Backups
 
-1. **Configuration files** (tracked in Git):
-   - `volumes/homeassistant/config/*.yaml`
-   - `nginx/conf.d/default.conf` (auto-generated)
-   - `tools/docker-compose.yml`
-   - `tools/scheduled-sync.sh`
-   - `tools/.env` file (all configuration settings - sensitive data excluded)
+**Daily automated backups** run at 2:00 AM via cron (`scheduled-backup.sh`):
+- ✅ Home Assistant configs (YAML, custom components, blueprints)
+- ✅ Nextcloud configs (PHP files)
+- ✅ Nginx configs (reverse proxy settings)
+- ✅ Docker configs (compose files, .env, scripts)
+- ✅ Network configs (interfaces, routes, state)
+- ✅ Automatic cleanup (keeps last 7 days)
 
-2. **Data directories** (backup separately):
-   - `volumes/nextcloud/` (user files and database)
-   - `volumes/homeassistant/data/` (runtime data)
-   - `volumes/plex/` (metadata and configuration)
-   - `$VIDEO_PATH` (video library)
-   - `$IMAGE_PATH` (photo library)
-   - `$DOC_PATH` (document storage)
-   - `logs/` (sync and maintenance logs)
+Backups saved to: `backup/` directory (excluded from git)
 
-3. **System configuration**:
-   - Cron jobs: `crontab -l > crontab_backup.txt`
-   - Secret files: Document recreation commands
+### Manual Backup
+
+```bash
+# Run backup immediately
+./tools/scheduled-backup.sh
+
+# Check backup contents
+ls -lh backup/
+
+# View backup logs
+tail -f logs/scheduled-backup.log
+```
+
+### Additional Data to Backup
+
+**User data** (backup separately - not included in automated backups):
+- `volumes/nextcloud/` (user files and database)
+- `volumes/homeassistant/data/` (runtime data)
+- `volumes/plex/` (metadata and configuration)
+- `$VIDEO_PATH` (video library)
+- `$IMAGE_PATH` (photo library)
+- `$DOC_PATH` (document storage)
+
+**System state:**
+- Cron jobs: `crontab -l > crontab_backup.txt`
+- Secret files: `secrets/db_password`, `secrets/db_root_password`
 
 ### Git Workflow
 
+**Privacy-Focused Configuration:**
+The `.gitignore` file excludes all personal data:
+- ✅ `volumes/` - All container data and configs
+- ✅ `backup/` - Automated backups
+- ✅ `logs/` - Application logs
+- ✅ `nginx/` - Generated configs and certificates
+- ✅ `secrets/` - Database passwords
+- ✅ `tools/.env` - Your configuration settings
+
 ```bash
-# Commit configuration changes
-git add volumes/homeassistant/config/*.yaml
-git add tools/docker-compose.yml tools/scheduled-sync.sh tools/scheduled-cleanup.sh
-git add tools/generate_nginx_config.sh tools/validate_config.sh
+# Only commit scripts and documentation
+git add tools/*.sh
 git add home_start.sh home_stop.sh home_update.sh
 git add README.md
-git commit -m "Update multi-path storage and automation system"
+git commit -m "Update automation scripts"
 git push
 
-# Note: .env file contains sensitive credentials and should not be committed
-# nginx/conf.d/default.conf is auto-generated and doesn't need to be committed
+# Your personal configs stay private and safe!
+```
+
+**Note:** If you accidentally committed sensitive files, use `git-filter-repo` to remove them from history:
+```bash
+sudo apt install git-filter-repo
+git filter-repo --path volumes/homeassistant/config/ --invert-paths
+git push --force --all
 ```
 
 ### 🔄 Scheduled Sync Backup
@@ -696,6 +756,33 @@ crontab crontab_backup.txt
 ./tools/scheduled-sync.sh
 tail -f logs/scheduled-sync.log
 ```
+
+### Cron Example: Automated Backups
+
+Use the included helper to install a daily cron job that runs the repository backup.
+
+Install (for the current user):
+
+```bash
+# Make the installer executable and run it (no sudo required for user crontab)
+chmod +x tools/install_backup_cron.sh
+./tools/install_backup_cron.sh
+
+# Verify the installed cron
+crontab -l
+```
+
+Manual crontab entry (example — runs backup daily at 03:00):
+
+```cron
+0 3 * * * /full/path/to/rpi-home-plex/tools/backup_config.sh >> /full/path/to/rpi-home-plex/logs/backup.log 2>&1
+```
+
+Notes:
+- The installer avoids duplicate entries and preserves existing cron jobs.
+- Backups are stored in `home/server_config_backup/` inside the project and rotated (default keep: 14).
+- Adjust schedule or retention by editing `tools/install_backup_cron.sh` or setting `KEEP_COUNT` environment variable when running the backup script.
+
 
 ## 🏷️ Version Requirements
 
@@ -752,6 +839,4 @@ tail -20 logs/scheduled-sync.log
 ```
 
 ---
-
-**⚡ Built for reliable home server hosting with Docker Swarm**  
 **🔧 Zero-configuration deployment with full customization support**

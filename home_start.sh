@@ -646,6 +646,24 @@ setup_storage_permissions() {
     
     # Setup all storage directories
     setup_directory_permissions "$DETECTED_VIDEO_PATH" "video"
+    
+    # Create and setup movies and series subdirectories
+    MOVIES_DIR="${DETECTED_VIDEO_PATH}/movies"
+    SERIES_DIR="${DETECTED_VIDEO_PATH}/series"
+    
+    if [ ! -d "$MOVIES_DIR" ]; then
+        echo "Creating movies directory: $MOVIES_DIR"
+        mkdir -p "$MOVIES_DIR"
+    fi
+    
+    if [ ! -d "$SERIES_DIR" ]; then
+        echo "Creating series directory: $SERIES_DIR"
+        mkdir -p "$SERIES_DIR"
+    fi
+    
+    setup_directory_permissions "$MOVIES_DIR" "movies"
+    setup_directory_permissions "$SERIES_DIR" "series"
+    
     setup_directory_permissions "$DETECTED_IMAGE_PATH" "image" 
     setup_directory_permissions "$DETECTED_DOC_PATH" "document"
     
@@ -769,7 +787,7 @@ echo "Waiting for services to stabilize before setting up automation..."
 sleep 30
 
 # Verify services are running before setting up automation
-STABLE_SERVICES=$(docker compose -f tools/docker-compose.yml ps --format json | jq -r '.State' | grep -c "running" || echo "0")
+STABLE_SERVICES=$(docker ps --filter "status=running" | grep -c "Up")
 
 if [ "$STABLE_SERVICES" -ge 6 ]; then  # All 6 services should be running (nginx, db, nextcloud, homeassistant, plex, webshare)
     echo "✓ Services are stable - setting up automation systems"
@@ -789,6 +807,8 @@ if [ "$STABLE_SERVICES" -ge 6 ]; then  # All 6 services should be running (nginx
 */10 * * * * ${CURRENT_DIR}/tools/scheduled-sync.sh
 @reboot sleep 360 && ${CURRENT_DIR}/tools/scheduled-cleanup.sh
 0 */6 * * * ${CURRENT_DIR}/tools/scheduled-cleanup.sh
+@reboot sleep 300 && ${CURRENT_DIR}/tools/scheduled-backup.sh
+0 2 * * * ${CURRENT_DIR}/tools/scheduled-backup.sh
 @reboot sleep 300 && ${CURRENT_DIR}/tools/scheduled-backup.sh
 0 2 * * * ${CURRENT_DIR}/tools/scheduled-backup.sh
 CRONEOF
@@ -899,5 +919,5 @@ echo "  • Downloaded files not visible in Nextcloud/Plex: Run ./tools/schedule
 echo "  • Plex shows 'Remote Access' in web browser: check if Plex use hostname network"
 echo "  • Webshare 'File temporarily unavailable': This is from webshare.cz servers,"
 echo "    not our application. Try again later or choose a different file."
-echo "  • SSL certificate warnings: Expected for self-signed certificates"
+echo "  • SSL certificate warnings: Expected for self-signed certificates, mobile apps may warn, if it possible and safe go over this warning"
 echo "  • Services starting slowly: Give containers 1-2 minutes to fully initialize"

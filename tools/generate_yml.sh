@@ -152,17 +152,6 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
   plex:
     image: linuxserver/plex
     container_name: rpi_home_plex
-    ports:
-      - "32400:32400/tcp"  # Web interface
-      - "1900:1900/udp"    # DLNA
-      - "3005:3005/tcp"    # Plex Companion
-      - "5353:5353/udp"    # Bonjour/Avahi
-      - "8324:8324/tcp"    # Roku via Plex Companion
-      - "32410:32410/udp"  # GDM network discovery
-      - "32412:32412/udp"  # GDM network discovery
-      - "32413:32413/udp"  # GDM network discovery
-      - "32414:32414/udp"  # GDM network discovery
-      - "32469:32469/tcp"  # Plex DLNA Server
     volumes:
       - ../volumes/plex/config:/config
       - ../volumes/plex/transcode:/transcode
@@ -185,8 +174,7 @@ fi
 
 # Continue with Plex service and add comments for local network configuration
 cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
-    networks:
-      - internal
+    network_mode: host
     restart: unless-stopped
     # Note: Plex is configured for both direct access (ports) and reverse proxy (internal network)
     # Direct access: http://SERVER_IP:32400 for devices
