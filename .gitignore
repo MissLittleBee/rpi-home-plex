@@ -1,10 +1,16 @@
 # Recommended .gitignore for your Docker Swarm Home Assistant & Nextcloud setup
 
-# All volumes and personal data
+# All volumes and personal data (contains user files, databases, configs)
 volumes/
+
+# Exception: Allow specific Home Assistant config for documentation (sanitize these!)
+# !volumes/homeassistant/config/configuration.yaml
+# !volumes/homeassistant/config/automations.yaml
 
 # Backups (may contain sensitive config)
 backup/
+*.backup
+*.backup.*
 
 # Logs
 logs/
@@ -14,6 +20,8 @@ nginx/
 
 # Ignore sensitive config files
 tools/.env
+tools/.env.*
+*.env
 
 # docker-compose.yml is generated, ignore it
 tools/docker-compose.yml
