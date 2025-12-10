@@ -199,8 +199,8 @@ setup_configuration() {
     
     # Domain/Hostname configuration
     echo "📡 Network Configuration:"
-    read -p "Hostname/Domain [ha.local]: " HOSTNAME
-    HOSTNAME=${HOSTNAME:-ha.local}
+    read -p "Hostname/Domain [my.local]: " HOSTNAME
+    HOSTNAME=${HOSTNAME:-my.local}
     
     # Auto-detect IP address
     DEFAULT_IP=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+' 2>/dev/null || echo "192.168.1.100")

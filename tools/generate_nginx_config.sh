@@ -64,8 +64,8 @@ server {
     }
     
     location /nextcloud/ {
-        # Don't strip /nextcloud/ - pass full path to backend
-        proxy_pass http://app:80;
+        # Strip /nextcloud/ prefix by adding trailing slash to proxy_pass
+        proxy_pass http://app:80/;
         
         # Essential headers for Nextcloud
         proxy_set_header Host \$host;

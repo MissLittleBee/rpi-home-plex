@@ -72,13 +72,13 @@ services:
       - MYSQL_USER=nextcloud
       - MYSQL_PASSWORD_FILE=/run/secrets/db_password
       - MYSQL_HOST=db
-      - OVERWRITEHOST=${HOSTNAME}
+      - OVERWRITEHOST=${HOSTNAME}.local
       - OVERWRITEPROTOCOL=https
       - OVERWRITEWEBROOT=/nextcloud
       - TRUSTED_PROXIES=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_USER}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_PASSWORD}
-      - NEXTCLOUD_TRUSTED_DOMAINS=${HOSTNAME}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${HOSTNAME}.local ${SERVER_IP} nextcloud.${DOMAIN_NAME}
     networks:
       - internal
 
