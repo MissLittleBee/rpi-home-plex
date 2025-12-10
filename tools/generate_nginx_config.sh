@@ -64,8 +64,8 @@ server {
     }
     
     location /nextcloud/ {
-        # Add trailing slash to proxy_pass to strip /nextcloud/ from path
-        proxy_pass http://app:80/;
+        # Don't strip /nextcloud/ - pass full path to backend
+        proxy_pass http://app:80;
         
         # Essential headers for Nextcloud
         proxy_set_header Host \$host;
@@ -74,10 +74,6 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Forwarded-Host \$host;
         proxy_set_header X-Forwarded-Port 443;
-        
-        # Mobile app specific headers
-        proxy_set_header X-Forwarded-Prefix /nextcloud;
-        proxy_set_header X-Script-Name /nextcloud;
         
         # Request handling
         proxy_buffering off;
@@ -99,7 +95,7 @@ server {
     }
     
     location /plex/ {
-        proxy_pass http://${SERVER_IP}:32400/;
+        proxy_pass http://plex:32400/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -140,7 +136,7 @@ server {
 
     # Plex web assets (CSS, JS, images) - catch assets that don't have /plex/ prefix
     location ~ ^/(web|library|:/|status|identity|myplex|system|updater|butler)/ {
-        proxy_pass http://${SERVER_IP}:32400;
+        proxy_pass http://plex:32400;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

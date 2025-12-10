@@ -1,613 +1,438 @@
 # 🏠 RPi Home Server Stack
 
-A complete Docker Compose-based home server solution providing file sharing, media streaming, home automation, SSL-secured reverse proxy access, and automated library synchronization.
+Complete Docker-based home server with media streaming, file sharing, home automation, and secure remote access via Cloudflare tunnel.
 
 ## 📋 Overview
 
-This project provides a **fully automated, zero-configuration** home server stack using Docker Compose. Simply run `./home_start.sh` and answer a few questions to deploy a complete media and home automation platform.
+**Fully automated deployment** - Run `./home_start.sh` and answer prompts to deploy everything.
 
 **🎯 Key Features:**
-- **🚀 One-Command Deployment** - Interactive setup handles everything automatically
-- **🔧 Zero Hardcoded Values** - Fully portable and configurable with validation
-- **📁 Multi-Path Storage** - Separate directories for Videos, Images, and Documents
-- **� Shared Permission System** - Media group ensures cross-service file access
-- **📱 Mobile App Support** - Optimized nginx configuration for Nextcloud mobile apps
-- **🔄 Unified Automation** - Sync every 10min, cleanup every 6h, backups daily at 2 AM via cron
-- **🔒 Security Built-In** - SSL certificates, secrets management, reverse proxy, sensitive configs excluded from git
-- **📱 Mobile App Ready** - Certificate installation guide for secure mobile access
+- **🚀 One-Command Setup** - Interactive configuration and deployment
+- **📁 Organized Storage** - Movies/Series auto-routing for downloads
+- **👥 Shared Permissions** - Media group (GID 1001) for cross-service access
+- **🔄 Auto-Maintenance** - Sync every 10min, cleanup every 6h, backups daily at 2 AM
+- **🛡️ Cloud Security** - Cloudflare Zero Trust tunnel for secure remote access
+- **📱 Mobile Ready** - Optimized for mobile apps and smart TVs
 
-**📦 Included Services:**
-- **🔒 Nginx Reverse Proxy** - SSL-terminated proxy with dynamic configuration and mobile app support
-- **☁️ Nextcloud** - Self-hosted file sharing and collaboration platform with multi-directory support (Videos, Images, Documents)
-- **🏡 Home Assistant** - Home automation and IoT device management platform
-- **🎬 Plex Media Server** - Professional media server with optimized reverse proxy configuration for local network detection
-- **🔍 Webshare Search** - English web interface for searching and downloading from webshare.cz with real-time progress tracking
-- **🗄️ MariaDB** - Database backend for Nextcloud
-- **🔄 Automated Maintenance** - Scheduled sync (every 10 minutes), Docker cleanup (every 6 hours), and config backups (daily at 2 AM)
+**📦 Services:**
+- **Nginx** - SSL reverse proxy
+- **Nextcloud** - File sharing and collaboration
+- **Home Assistant** - Home automation platform
+- **Plex Media Server** - Media streaming with hardware transcoding
+- **Webshare Search** - Download manager with content type selector
+- **Cloudflare Tunnel** - Secure remote access without port forwarding
+- **MariaDB** - Database backend
 
 ## 🏗️ Architecture
 
 ```
-Internet → Nginx (SSL) → Internal Services
-                ├── Nextcloud (/nextcloud) ←──┐
-                ├── Home Assistant (/)        │ Auto-Sync
-                ├── Plex Media Server (/plex) ←┘ (Every 10min)
-                └── Webshare Search (/ws)
+Internet → Cloudflare Tunnel → Nginx (SSL) → Services
+                                  ├── Home Assistant (/)
+                                  ├── Nextcloud (/nextcloud)
+                                  ├── Plex (/plex)
+                                  └── Webshare (/ws)
+                                  
+Host Storage → Docker Volumes → Services
+├── /mnt/data/together/movies/
+│   ├── movies/    → Plex Movies + Webshare downloads
+│   └── series/  → Plex Series + Webshare downloads
 ```
-
-### 🎬 Multi-Path Storage System
-
-- **Organized Storage**: Separate directories for Videos, Images, and Documents
-- **Shared Access**: All services access storage with proper `media` group permissions (GID 1001)
-- **Automatic Permissions**: setgid directories ensure new files get correct group ownership
-- **Scheduled Maintenance**: Permission fixes every 6 hours via automated cleanup
-- **Multi-Library Support**: Plex serves both video and photo libraries with automatic metadata
-- **Progress Tracking**: Real-time download progress bars with English interface
-- **Cross-Platform Visibility**: Files automatically visible in Nextcloud, Plex, and mobile apps
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Ubuntu/Debian-based Linux system (tested on Raspberry Pi OS)
-- Docker installed and running
-- Domain name or local hostname (e.g., `ha.local`)
+- Ubuntu/Debian-based Linux (tested on Raspberry Pi OS)
+- Docker and Docker Compose installed
+- Domain name (for Cloudflare tunnel)
 
-### 1. Clone Repository
-
-```bash
-git clone <your-gitlab-repo-url>
-cd rpi_home
-```
-
-### 2. Deploy Everything
+### Deploy
 
 ```bash
+# Clone repository
+git clone <repo-url>
+cd rpi-home-plex
+
+# Deploy everything (interactive setup)
 ./home_start.sh
 ```
 
-**That's it!** The `home_start.sh` script will:
-- 🖥️ **Interactive Setup**: Ask for your configuration (hostname, IPs, webshare credentials, Nextcloud user, etc.)
-- ✅ **Auto-Generate**: Create `tools/.env` file and nginx configuration
-- ✅ **Setup Docker Environment**: Configure container orchestration
-- ✅ **Create Secrets**: Generate secure random database passwords
-- ✅ **Generate SSL Certificates**: Create certificates for your hostname/IPs
-- ✅ **Validate Configuration**: Verify all settings before deployment
-- ✅ **Deploy Services**: Start all containers with your custom configuration
-- ✅ **Setup Auto-Sync**: Configure automatic library synchronization
-- ✅ **Initial Sync**: Trigger first library sync and verify service status
+The script will:
+1. ✅ Check prerequisites (Docker, OpenSSL, curl, cron)
+2. ✅ Prompt for configuration (hostname, IPs, credentials, paths)
+3. ✅ Generate `.env` file and SSL certificates
+4. ✅ Create docker-compose.yml
+5. ✅ Set up directories with correct permissions
+6. ✅ Deploy all containers
+7. ✅ Configure cron jobs for automation
+8. ✅ Run initial library sync
 
-### 4. Configuration Options
+### Configuration Prompts
 
-During setup, you'll be asked for:
-- **Hostname/Domain** (e.g., `ha.local`, `myserver.com`)
-- **Server IP Address** (auto-detected)
-- **VPN IP Address** (optional, for VPN access)
-- **Webshare.cz Credentials** (username and password)
-- **Plex Claim Token** (optional, from https://www.plex.tv/claim/ - automatically removed after setup for security)
-- **Storage Directory Paths**:
-  - Video directory (default: `/home/user/videos`)
-  - Image directory (default: `/home/user/images`)
-  - Document directory (default: `/home/user/documents`)
-- **Nextcloud Admin Username** (default: `admin`)
-- **Timezone** (auto-detected from system)
+You'll be asked for:
+- **Hostname/Domain** (e.g., `rpi.local`)
+- **Server IP** (auto-detected)
+- **VPN IP** (optional)
+- **Webshare.cz credentials** (username/password)
+- **Plex Claim Token** (optional, from https://www.plex.tv/claim/)
+- **Cloudflare Tunnel Token** (from Cloudflare Zero Trust dashboard)
+- **Storage Paths**:
+  - Base video path (default: `/mnt/data/together/movies`)
+  - Movies subdirectory (default: `movies`)
+  - Series subdirectory (default: `series`)
+- **Nextcloud Admin** (default: `admin`)
+- **Timezone** (auto-detected)
 
-### 4. Reconfigure Anytime
+### Access Services
 
-```bash
-# Quick restart (preserves configuration)
-./home_stop.sh && ./home_start.sh
+**Local Access (via nginx reverse proxy):**
+- Home Assistant: `https://rpi.local/`
+- Nextcloud: `https://rpi.local/nextcloud/`
+- Plex: `https://rpi.local/plex/`
+- Webshare: `https://rpi.local/ws/`
 
-# Change configuration
-./home_start.sh --reconfigure
+**Direct Device Access (for apps/TVs):**
+- Plex: `http://192.168.1.x:32400`
 
-# Fresh setup (remove config)
-./home_stop.sh  # Choose config removal
-./home_start.sh
-
-# Validate current config
-./tools/validate_config.sh
-```
-
-### 5. Access Services
-
-Services will be available at your configured hostname/IP:
-- **Home Assistant**: `https://[your-hostname]/`
-- **Nextcloud**: `https://[your-hostname]/nextcloud/`
-- **Plex Media Server**: 
-  - **Web Browser**: `https://[your-hostname]/plex/` (optimized for local network detection)
-  - **Apps & Devices**: `http://[server-ip]:32400` (direct access for mobile apps, smart TVs)
-- **Webshare Search**: `https://[your-hostname]/ws/`
-
-All services are automatically configured with proper authentication and media library synchronization.
+**Remote Access (via Cloudflare):**
+- Home Assistant: `https://ha.yourdomain.com`
+- Nextcloud: `https://nextcloud.yourdomain.com`
+- Plex: `https://plex.yourdomain.com`
 
 ## 📁 Project Structure
 
 ```
-rpi_home/
-├── home_start.sh              # 🚀 Main deployment script (interactive setup)
-├── home_stop.sh               # ⏹️ Stop all services
-├── home_update.sh             # 🔄 Update and redeploy services
-├── tools/                     # 🛠️ Utility scripts and configs
-│   ├── .env                   # ⚙️ Configuration file (auto-generated)
-│   ├── docker-compose.yml     # Main service definitions with multi-path storage
-│   ├── Dockerfile.webshare    # Webshare app container build
-│   ├── scheduled-sync.sh      # Efficient sync script (runs every 10min)
-│   ├── scheduled-cleanup.sh   # Automated cleanup and permission fixes (runs every 6h)
-│   ├── scheduled-backup.sh    # Configuration backup script (runs daily at 2 AM)
+rpi-home-plex/
+├── home_start.sh              # 🚀 Main deployment script
+├── home_stop.sh               # ⏹️ Stop services with cleanup options
+├── home_update.sh             # 🔄 Update and redeploy
+├── tools/
+│   ├── .env                   # ⚙️ Configuration (auto-generated)
+│   ├── docker-compose.yml     # Service definitions
+│   ├── Dockerfile.webshare    # Webshare app build
+│   ├── scheduled-sync.sh      # Library sync (every 10min)
+│   ├── scheduled-cleanup.sh   # Maintenance (every 6h)
+│   ├── scheduled-backup.sh    # Config backup (daily 2 AM)
 │   ├── create_ssl.sh          # SSL certificate generator
-│   ├── fix_homeassistant.sh   # Home Assistant configuration fixes
-│   ├── generate_nginx_config.sh # Dynamic nginx config generator (with backup)
-│   └── validate_config.sh     # Configuration validator (multi-path aware)
+│   ├── generate_nginx_config.sh # Nginx config generator
+│   └── validate_config.sh     # Configuration validator
 ├── nginx/
 │   ├── conf.d/
-│   │   └── default.conf       # Reverse proxy configuration (auto-generated)
+│   │   └── default.conf       # Reverse proxy config (auto-generated)
 │   └── cert/                  # SSL certificates (auto-generated)
+├── secrets/
+│   ├── db_password            # MariaDB password (auto-generated)
+│   └── db_root_password       # MariaDB root password (auto-generated)
 ├── volumes/
-│   ├── homeassistant/
-│   │   ├── config/            # HA configuration files (excluded from git for privacy)
-│   │   └── data/              # HA runtime data (ignored)
-│   ├── nextcloud/             # Nextcloud data (ignored)
-│   ├── plex/                  # Plex data (ignored)
-│   └── webshare/              # Webshare search application
-├── backup/                    # 📦 Automated config backups (daily 2 AM, excluded from git)
-├── logs/                      # 📄 Application logs (excluded from git)
-└── README.md                  # 📖 This documentation
+│   ├── homeassistant/         # HA config and data
+│   ├── nextcloud/             # Nextcloud data
+│   ├── plex/                  # Plex metadata
+│   └── webshare/              # Webshare app
+├── logs/                      # Application logs
+└── README.md
 ```
 
-## 🔧 Management Scripts
+## 🔧 Management
 
-### Stack Management
+### Stack Control
 
 ```bash
-# Start all services (fully automated setup)
+# Start (uses existing config if available)
 ./home_start.sh
-
-# Stop all services with detailed cleanup options
-./home_stop.sh
-
-# Update and redeploy services
-./home_update.sh
-```
-
-**home_start.sh Complete Workflow:**
-1. Prerequisites check (Docker, OpenSSL, curl, cron, python3)
-2. Interactive configuration setup
-3. Docker environment setup
-4. SSL certificate generation
-5. Nginx configuration generation  
-6. Configuration validation
-7. Docker Compose deployment
-8. Auto-sync setup and initial library sync
-9. Service status verification
-
-**🔄 Sync Management**
-
-```bash
-# Manual sync (triggers immediate Nextcloud + Plex refresh)
-./tools/scheduled-sync.sh
-
-# Check sync logs
-tail -f logs/scheduled-sync.log
-
-# View current cron jobs
-crontab -l
-
-# Validate current configuration
-./tools/validate_config.sh
-```
-
-**Scheduled sync runs automatically every 10 minutes and after system reboot.**
-Initial sync is triggered automatically during deployment. Uses efficient API-based approach with minimal resource usage.
-
-**🔄 Backup Management**
-
-```bash
-# Manual backup (saves all configs to backup/ directory)
-./tools/scheduled-backup.sh
-
-# Check backup logs
-tail -f logs/scheduled-backup.log
-
-# View backups
-ls -lh backup/
-```
-
-**Scheduled backups run automatically daily at 2:00 AM** via cron. Includes:
-- Home Assistant config (YAML files, custom components, blueprints)
-- Nextcloud config (PHP config files)
-- Nginx config (reverse proxy settings)
-- Docker config (docker-compose.yml, .env, all scripts)
-- Network config (interfaces, routes, current state)
-
-Old backups are automatically cleaned up (keeps last 7 days).
-
-### Automated Maintenance System
-
-The system includes comprehensive automated maintenance:
-
-```bash
-# Run storage permission fixes and Docker cleanup manually
-./tools/scheduled-cleanup.sh cleanup
-
-# Check maintenance logs
-tail -f logs/scheduled-cleanup.log
-
-# View automation status (both sync and cleanup)
-./tools/validate_config.sh
-```
-
-**Automated Maintenance Features:**
-- **Docker Cleanup**: Removes unused containers, images, and networks every 6 hours
-- **Permission Fixes**: Ensures all storage directories have correct media group ownership
-- **Multi-Path Support**: Handles Videos, Images, and Documents directories separately
-- **Cron Integration**: Unified with sync system for consistent scheduling
-
-### Detailed Cleanup Information
-
-The `./home_stop.sh` script provides detailed explanations of what will be cleaned when you choose cleanup options:
-
-### Quick Restart Workflow
-
-```bash
-# Quick restart (preserves all configuration)
-./home_stop.sh        # Choose "N" to keep config files
-./home_start.sh       # Uses existing configuration, skips interactive setup
-
-# Fresh setup (reconfigure everything)  
-./home_stop.sh        # Choose "Y" to remove config files
-./home_start.sh       # Runs full interactive setup
 
 # Reconfigure without stopping
 ./home_start.sh --reconfigure
-```
 
-**Restart Options:**
-- **Docker Resource Cleanup**: Removes unused networks, dangling images, build cache, and stopped containers while preserving your data and running services
-- **Configuration Cleanup**: Option to remove config files for fresh setup or preserve for quick restart
-- **Automation Cleanup**: Option to remove cron jobs while preserving sync scripts, logs, and media files
-
-## ⚙️ Configuration
-
-All configuration is stored in `tools/.env` and automatically generated during setup. No manual configuration files to edit!
-
-### Configuration Management
-
-**Centralized Configuration:**
-- Single configuration file: `tools/.env`
-- All services use environment variables from this file
-- No hardcoded values anywhere in the system
-- Automatic validation before deployment
-
-**Configuration Contents:**
-```bash
-# Network Configuration
-HOSTNAME=your.domain.com
-SERVER_IP=192.168.1.100
-VPN_IP=10.10.20.1
-
-# Webshare.cz Configuration  
-WEBSHARE_USERNAME=your_username
-WEBSHARE_PASSWORD=your_password
-
-# Plex Configuration
-PLEX_CLAIM_TOKEN=claim-xxxxxxxxxxxx
-
-# Storage Configuration
-VIDEO_PATH=/path/to/your/videos
-IMAGE_PATH=/path/to/your/images
-DOC_PATH=/path/to/your/documents
-
-# Nextcloud Configuration
-NEXTCLOUD_USER=admin
-NEXTCLOUD_PASSWORD=secure_password
-
-# System Configuration
-TIMEZONE=Europe/Prague
-```
-
-**Managing Configuration:**
-```bash
-# Reconfigure everything
-./home_start.sh --reconfigure
-
-# Validate current settings
-./tools/validate_config.sh
-
-# View current configuration
-cat tools/.env
-```
-
-### Home Assistant
-
-Configuration files are stored in `volumes/homeassistant/config/`:
-- `configuration.yaml` - Main configuration
-- `automations.yaml` - Automation rules
-- `scripts.yaml` - Custom scripts
-- `scenes.yaml` - Scene definitions
-- `secrets.yaml` - Sensitive credentials
-
-**Privacy Note:** Home Assistant configs are **excluded from git** (`.gitignore`) to protect personal data. Use `scheduled-backup.sh` for local backups.
-
-Runtime data in `volumes/homeassistant/data/` is also excluded.
-
-### Nextcloud
-
-**Manual Setup Required**: For better control and reliability, Nextcloud uses manual setup through web interface.
-
-🚀 **Fresh Installation Process:**
-1. Access https://[your-hostname]/nextcloud/
-2. **Create admin account** with your preferred username and password
-3. **Database configuration** (automatically provided):
-   - Database & user: `nextcloud`
-   - Database password: Available in `secrets/db_password` file
-   - Database host: `db`
-   - Leave other fields as default
-4. Click 'Finish setup'
-5. **Media library ready** at the correct user path
-
-**What's Pre-Configured:**
-- ✅ Database connection: MariaDB backend with auto-generated secure passwords
-- ✅ Trusted domains: Pre-configured for your `HOSTNAME`
-- ✅ Storage mounts: Videos, Images, and Documents directories correctly mapped
-- ✅ Reverse proxy: Ready for `/nextcloud/` path access
-- ✅ SSL termination: Handled by nginx reverse proxy
-
-**Setup Instructions**: Detailed database credentials and setup steps provided in deployment output.
-
-**⚠️ Important**: This auto-setup only works on **first deployment**. If you already have Nextcloud data, you'll need to use existing credentials.
-
-**To Reset Nextcloud** (if needed):
-```bash
-# Stop services and remove Nextcloud data
+# Stop with cleanup options
 ./home_stop.sh
-sudo rm -rf volumes/nextcloud/
-./home_start.sh  # Will trigger fresh auto-setup
+
+# Update containers
+./home_update.sh
 ```
 
-### 🎬 Plex Media Server & Local Network Optimization
+### Manual Operations
 
-Media files are organized in separate directories with automated management:
-
-**Dual Access Configuration:**
-- **Reverse Proxy Web Access**: `https://[hostname]/plex/` - Optimized for local network detection with special headers
-- **Direct Device Access**: `http://[server-ip]:32400` - For mobile apps, smart TVs, game consoles with auto-discovery
-- **Local Network Recognition**: Reverse proxy connections treated as local for full streaming quality
-- **Automatic Device Discovery**: DLNA and GDM ports exposed for seamless device connection
-
-**Multi-Library Setup:**
-- **Video Library**: `{VIDEO_PATH}` - Movies, TV shows, and video content
-- **Photo Library**: `{IMAGE_PATH}` - Photos, screenshots, and image collections
-- **Documents**: Available in Nextcloud at `{DOC_PATH}`
-
-**Permission System:**
-- **Media Group**: All services use shared `media` group (GID 1001)
-- **Automatic Ownership**: New files inherit correct group via setgid directories
-- **Cross-Service Access**: Webshare downloads → Plex indexing → Nextcloud visibility
-
-**Auto-Sync Features:**
-- ✅ Libraries sync every 10 minutes automatically
-- ✅ Permission fixes every 6 hours via scheduled cleanup
-- ✅ New downloads appear across all services
-- ✅ Renamed files are detected and updated
-- ✅ Automatic metadata fetching and library organization
-- ✅ Survives system reboots with cron automation
-
-#### 🚨 Critical: Plex Library Path Configuration
-
-**⚠️ IMPORTANT**: Plex is **extremely sensitive** to library paths. You **MUST** configure library paths using **container paths**, not host paths!
-
-**Why This Matters:**
-- Your files are mounted from host to container (e.g., `/mnt/data/together/movies` → `/media/videos`)
-- Plex runs **inside the container** and only sees container paths
-- Using host paths will result in **empty libraries** (0 videos shown)
-
-**✅ Correct Library Configuration:**
-
-When setting up Plex libraries through the web interface (`https://[hostname]/plex/` or `http://[server-ip]:32400/web`):
-
-**For Movies Library:**
-   - Go to: Settings → Manage → Libraries → Add Library
-   - Type: Movies
-   - **Container Path**:  e.g. `/media/videos/Filmy` (or your movies subdirectory)
-   - ❌ **DO NOT USE**: `host path
-
- - repeat it for all your libraries (photos, series, etc.)
-
-**Directory Structure Requirements:**
-
-Plex expects **separate directories** for different content types:
-
-```
-{VIDEO_PATH}/                    # Mounted as /media/videos in container
-├── Movies/                      # Movies directory
-│   ├── Movie Title (2024)/
-│   │   └── Movie Title (2024).mkv
-│   └── Another Movie (2023)/
-│       └── Another Movie (2023).mp4
-│
-└── Series/                    # TV Series directory
-    ├── Series Name/
-    │   ├── Season 01/
-    │   │   ├── S01E01.mkv
-    │   │   └── S01E02.mkv
-    │   └── Season 02/
-    │       └── S02E01.mkv
-    └── Another Series/
-        └── Season 01/
-            └── S01E01.mkv
-```
-
-**🔍 Webshare Integration:**
-- The webshare app automatically downloads to the correct directories
-- Movies go to `{MOVIES_PATH}` (configured in `.env`)
-- Series go to `{SERIES_PATH}` (configured in `.env`)
-- Files are automatically detected by scheduled-sync.sh every 10 minutes
-
-**🛠️ Fixing Existing Libraries:**
-
-If you already created libraries with host paths:
-
-1. **Option A - Via Web UI** (Recommended):
-   - Settings → Manage → Libraries
-   - Click library name → Edit
-   - Remove incorrect path
-   - Add correct container path (e.g., `/media/videos/movies`)
-   - Save and scan
-
-2. **Option B - Delete and Recreate**:
-   - Settings → Manage → Libraries
-   - Delete incorrectly configured library
-   - Create new library with correct container paths
-   - Plex will rescan and fetch all metadata
-
-**Verification:**
 ```bash
-# Check if Plex can see your files (run on host)
-docker exec rpi_home_plex ls -la /path_to_your_movies
-docker exec rpi_home_plex ls -la path_to_your_series
-
-# Manual library refresh
+# Trigger sync immediately
 ./tools/scheduled-sync.sh
+
+# Run maintenance (permissions + Docker cleanup)
+./tools/scheduled-cleanup.sh cleanup
+
+# Backup configs
+./tools/scheduled-backup.sh
+
+# Validate configuration
+./tools/validate_config.sh
 ```
 
-After fixing paths, your libraries should populate within minutes!
+### View Logs
 
-**🔍 Webshare Search Application
+```bash
+# Container logs
+docker compose -f tools/docker-compose.yml logs <service>
 
-Advanced web interface for webshare.cz API integration with comprehensive real-time features:
+# Sync logs
+tail -f logs/scheduled-sync.log
 
-**🎯 Core Features:**
-- **Search Interface**: Clean, responsive web UI for content discovery
-- **Secure Authentication**: Proper salt-based password hashing for webshare.cz API
-- **Real-Time Progress**: Live download tracking with actual file system monitoring
-- **English Interface**: Fully translated UI (no more Czech "Kontaktuji server")
-- **File Permissions**: Automatic UID 1000 mapping for proper Docker volume access
-- **Background Downloads**: Non-blocking downloads with progress API endpoints
+# Cleanup logs
+tail -f logs/scheduled-cleanup.log
 
-**🔧 Technical Implementation:**
-- **Backend**: Python Flask with webshare.cz XML API integration
-- **Real-Time Tracking**: Background download threads with progress monitoring
-- **Authentication**: Proper salt/hash mechanism using passlib library
-- **Frontend**: Vanilla JavaScript with real-time progress polling
-- **Docker Integration**: Runs as containerized service behind nginx proxy
-
-**📊 Progress Tracking Details:**
-- Downloads run in background Python threads
-- Progress tracked by monitoring actual file size growth
-- JavaScript polls `/api/download/progress/<fileId>` every second
-- Shows real percentage based on downloaded vs total file size
-- Automatic cleanup of completed downloads after 30 seconds
-- Error handling for network issues and download failures
-
-**⚙️ Configuration:**
-1. Configuration handled automatically via `tools/.env`:
-   ```bash
-   WEBSHARE_USERNAME=your_username
-   WEBSHARE_PASSWORD=your_password
-   ```
-2. Application auto-authenticates using environment variables
-2. Downloads save directly to `$VIDEO_PATH` with correct media group permissions
-4. Files automatically appear in Nextcloud and Plex within 10 minutes via scheduled sync
-
-### SSL Certificates
-
-Self-signed certificates are generated automatically during setup.
-
-**For Production:**
-1. Obtain certificates from Let's Encrypt or CA
-2. Replace files in `nginx/cert/`
-3. Update `nginx/conf.d/default.conf` if needed
-
-## 🌐 Network Configuration
-
-### Ports
-
-- **80/443** - Nginx (HTTP/HTTPS reverse proxy)
-- **8123** - Home Assistant (direct access, also available via proxy at /)
-- **32400** - Plex Media Server (direct access, also available via proxy at /plex/)
-- **5000** - Webshare Search (direct access, also available via proxy at /ws/)
-
-### DNS
-
-Add to `/etc/hosts` or configure local DNS:
+# Backup logs
+tail -f logs/scheduled-backup.log
 ```
-192.168.1.100  ha.local
-```
-
-### VPN Access
-
-For VPN access without local DNS, use IP addresses directly:
-- **Home Assistant**: https://10.10.20.1/
-- **Nextcloud**: https://10.10.20.1/nextcloud/
-- **Plex Media Server**: https://10.10.20.1/plex/
-- **Webshare Search**: https://10.10.20.1/ws/
-
-## 🔐 Security
-
-- All services run behind SSL-terminated reverse proxy
-- Database credentials stored as secret files
-- Media servers accessible via direct IP to bypass authentication
-- Home Assistant configured with trusted proxy headers
-
-## 📊 Monitoring
 
 ### Service Status
 
 ```bash
-```bash
-# Check all services
+# Check all containers
 docker compose -f tools/docker-compose.yml ps
 
-# View service logs
-docker compose -f tools/docker-compose.yml logs <service_name>
+# Check cron jobs
+crontab -l
 ```
 
-# View cleanup logs
-tail -f /var/log/docker-cleanup.log
+## ⚙️ Configuration
 
-# Monitor auto-sync activity
-tail -f logs/scheduled-sync.log
-```
-
-### Health Checks
-
-Access service status pages:
-- **Home Assistant**: System → Info
-- **Nextcloud**: Settings → Administration → System  
-- **Plex Media Server**: https://ha.local/plex/ → Settings → General
-- **Webshare**: http://ha.local:5000/health (API endpoint)
-
-### 🔄 Auto-Sync Monitoring
+All configuration stored in `tools/.env` (auto-generated during setup):
 
 ```bash
-# Check sync logs
-tail -20 logs/scheduled-sync.log
+# Network
+HOSTNAME=rpi.local
+SERVER_IP=192.168.1.100
+VPN_IP=10.10.20.1
 
-# Verify cron jobs
-crontab -l
+# Webshare.cz
+WEBSHARE_USERNAME=username
+WEBSHARE_PASSWORD=password
 
-# Test sync manually
-./tools/scheduled-sync.sh
+# Plex (auto-removed after first start for security)
+PLEX_CLAIM_TOKEN=claim-xxxx
 
-# Check last sync time
-ls -la logs/scheduled-sync.log
+# Cloudflare
+TUNNEL_TOKEN=your-tunnel-token
+
+# Storage
+VIDEO_PATH=/mnt/data/together/movies
+MOVIES_PATH=/mnt/data/together/movies/movies
+SERIES_PATH=/mnt/data/together/movies/series
+
+# Nextcloud
+NEXTCLOUD_USER=admin
+NEXTCLOUD_PASSWORD=auto-generated
+
+# System
+TIMEZONE=Europe/Prague
+```
+
+### Reconfiguration
+
+```bash
+# Reconfigure everything
+./home_start.sh --reconfigure
+
+# Or stop and remove config
+./home_stop.sh  # Choose "Y" to remove config
+./home_start.sh
+```
+
+## 🎬 Plex Configuration
+
+### Critical: Container Paths
+
+**⚠️ IMPORTANT**: Plex requires **container paths**, not host paths!
+
+**Container Path Mapping:**
+```
+Host Path                              → Container Path
+/mnt/data/together/movies/movies        → /media/videos/movies
+/mnt/data/together/movies/series      → /media/videos/series
+```
+
+**✅ Correct Library Setup:**
+1. Access Plex: `https://rpi.local/plex/` or `http://192.168.1.x:32400/web`
+2. Settings → Manage → Libraries → Add Library
+3. For Movies: Select `/media/videos/movies` (container path)
+4. For Series: Select `/media/videos/series` (container path)
+
+**❌ Wrong:** `/mnt/data/together/movies/movies` (host path)  
+**✅ Right:** `/media/videos/series` (container path)
+
+### Dual Access Mode
+
+- **Reverse Proxy** (`https://rpi.local/plex/`): Browser access with local network detection
+- **Direct Access** (`http://192.168.1.x:32400`): Mobile apps, smart TVs, auto-discovery
+
+### Auto-Sync
+
+- New files detected every 10 minutes via `scheduled-sync.sh`
+- Uses Plex API for efficient section-by-section scanning
+- Permissions fixed automatically every 6 hours
+
+### Fixing Wrong Paths
+
+If libraries are empty:
+
+```bash
+# Verify container can see files
+docker exec rpi_home_plex ls -la /media/videos/movies
+docker exec rpi_home_plex ls -la /media/videos/series
+
+# Fix via Plex web UI
+# Settings → Libraries → Edit → Remove wrong path → Add correct container path
+```
+
+## 🔍 Webshare Integration
+
+**Features:**
+- English web interface for webshare.cz
+- Content type selector (🎬 Movies / 📺 Series)
+- Real-time download progress tracking
+- Automatic routing to correct directories
+- Proper file permissions for Plex access
+
+**How It Works:**
+1. Search for content at `https://rpi.local/ws/`
+2. Select Movie or Series
+3. Click download
+4. Files save to `MOVIES_PATH` or `SERIES_PATH`
+5. Plex detects files within 10 minutes via auto-sync
+
+## ☁️ Nextcloud Setup
+
+**First-Time Setup** (manual via web interface):
+
+1. Access: `https://rpi.local/nextcloud/`
+2. Create admin account (use your preferred credentials)
+3. Database configuration:
+   - Database & user: `nextcloud`
+   - Password: Check `secrets/db_password`
+   - Host: `db`
+4. Click "Finish setup"
+
+**Pre-configured:**
+- ✅ Database connection (MariaDB)
+- ✅ Trusted domains
+- ✅ Storage mounts
+- ✅ Reverse proxy headers
+- ✅ SSL termination
+
+**To Reset:**
+```bash
+./home_stop.sh
+sudo rm -rf volumes/nextcloud/
+./home_start.sh
+```
+
+## 🛡️ Cloudflare Tunnel
+
+**Setup:**
+1. Create tunnel in Cloudflare Zero Trust dashboard
+2. Get tunnel token
+3. Add token during `./home_start.sh` setup
+4. Configure public hostnames:
+   - `ha.yourdomain.com` → `https://nginx`
+   - `nextcloud.yourdomain.com` → `https://nginx/nextcloud`
+   - `plex.yourdomain.com` → `https://nginx/plex`
+
+**Benefits:**
+- No port forwarding required
+- DDoS protection
+- Access logging
+- Zero Trust security policies
+
+## 🔄 Automated Maintenance
+
+### Scheduled Sync (Every 10 Minutes)
+
+- Scans Plex libraries via API
+- Detects new/changed files
+- Updates metadata automatically
+- Logs all activity to `logs/scheduled-sync.log`
+
+### Cleanup (Every 6 Hours)
+
+- Fixes file permissions (UID 1000, GID 1001, 775)
+- Removes unused Docker containers
+- Prunes dangling images
+- Cleans build cache
+- Logs to `logs/scheduled-cleanup.log`
+
+### Backups (Daily at 2 AM)
+
+- Home Assistant configs (YAML, custom components)
+- Nextcloud configs (PHP files)
+- Nginx configs
+- Docker configs (.env, compose files, scripts)
+- Keeps last 7 days
+- Logs to `logs/scheduled-backup.log`
+
+**Cron Jobs** (installed automatically):
+```cron
+*/10 * * * * /path/to/scheduled-sync.sh
+0 */6 * * * /path/to/scheduled-cleanup.sh cleanup
+0 2 * * * /path/to/scheduled-backup.sh
+@reboot /path/to/scheduled-sync.sh
 ```
 
 ## 🛠️ Troubleshooting
 
-### Common Issues
+### Services Not Starting
 
-**Services not starting:**
 ```bash
-# Check service logs
-docker compose -f tools/docker-compose.yml logs homeassistant
+# Check logs
+docker compose -f tools/docker-compose.yml logs <service>
 
 # Restart specific service
-docker compose -f tools/docker-compose.yml restart homeassistant
+docker compose -f tools/docker-compose.yml restart <service>
 ```
 
-**SSL certificate issues:**
+### Plex Library Empty
+
+```bash
+# Verify container paths (not host paths)
+docker exec rpi_home_plex ls -la /media/videos/movies
+
+# Check permissions
+ls -la /mnt/data/together/movies/
+
+# Fix permissions
+./tools/scheduled-cleanup.sh cleanup
+
+# Manual sync
+./tools/scheduled-sync.sh
+```
+
+### Files Not Appearing
+
+```bash
+# Check permissions
+ls -la $MOVIES_PATH $SERIES_PATH
+
+# Fix automatically
+./tools/scheduled-cleanup.sh cleanup
+
+# Force refresh
+docker compose -f tools/docker-compose.yml restart plex
+./tools/scheduled-sync.sh
+```
+
+### Sync Not Working
+
+```bash
+# Check cron
+systemctl status cron
+crontab -l
+
+# Test manually
+./tools/scheduled-sync.sh
+
+# View logs
+tail -20 logs/scheduled-sync.log
+```
+
+### SSL Issues
+
 ```bash
 # Regenerate certificates
 ./tools/create_ssl.sh
@@ -616,227 +441,143 @@ docker compose -f tools/docker-compose.yml restart homeassistant
 docker compose -f tools/docker-compose.yml restart nginx
 ```
 
-**Database connection errors:**
-```bash
-# Check database logs
-docker compose -f tools/docker-compose.yml logs db
-
-# Verify secrets exist
-ls -la secrets/
-```
-
-**Scheduled sync not working:**
-```bash
-# Check if cron is running
-systemctl status cron
-
-# Test sync manually
-./tools/scheduled-sync.sh
-
-# Check for container readiness
-docker ps | grep -E "(nextcloud|plex)"
-
-# View sync error logs
-tail -20 logs/scheduled-sync.log
-```
-
-**Files not appearing in services:**
-```bash
-# Check storage directory permissions (should use media group)
-ls -la $VIDEO_PATH $IMAGE_PATH $DOC_PATH
-
-# Fix permissions automatically (handles all storage directories)
-./tools/scheduled-cleanup.sh cleanup
-
-# Check what was fixed
-tail -20 logs/scheduled-cleanup.log
-
-# Force service refresh
-docker compose -f tools/docker-compose.yml restart app
-docker compose -f tools/docker-compose.yml restart plex
-```
-
-**Character encoding issues:**
-```bash
-# Rename folders with Czech characters to English
-mv "$MEDIA_PATH/Folder With Čeština" "$MEDIA_PATH/English Folder Name"
-
-# Manually rename episodes or create custom scripts as needed
-```
-
-### Reset Services
+### Complete Reset
 
 ```bash
-# Complete reset (removes all data)
 ./home_stop.sh
 docker system prune -a --volumes
+sudo rm -rf volumes/ secrets/ nginx/conf.d/ nginx/cert/
 ./home_start.sh
 ```
 
-## 🔄 Backup Strategy
+## 💾 Backup Strategy
 
-### Automated Backups
+### What's Backed Up Automatically
 
-**Daily automated backups** run at 2:00 AM via cron (`scheduled-backup.sh`):
-- ✅ Home Assistant configs (YAML, custom components, blueprints)
-- ✅ Nextcloud configs (PHP files)
-- ✅ Nginx configs (reverse proxy settings)
-- ✅ Docker configs (compose files, .env, scripts)
-- ✅ Network configs (interfaces, routes, state)
-- ✅ Automatic cleanup (keeps last 7 days)
+Daily at 2 AM via `scheduled-backup.sh`:
+- ✅ Home Assistant configs
+- ✅ Nextcloud configs
+- ✅ Nginx configs
+- ✅ Docker configs (.env, compose, scripts)
+- ✅ Network configs
+- ✅ Auto-cleanup (keeps 7 days)
 
-Backups saved to: `backup/` directory (excluded from git)
+Saved to: `backup/` (excluded from git)
 
 ### Manual Backup
 
 ```bash
-# Run backup immediately
+# Run now
 ./tools/scheduled-backup.sh
 
-# Check backup contents
+# View backups
 ls -lh backup/
 
-# View backup logs
+# Check logs
 tail -f logs/scheduled-backup.log
 ```
 
-### Additional Data to Backup
+### Additional Data (Manual Backup Needed)
 
-**User data** (backup separately - not included in automated backups):
-- `volumes/nextcloud/` (user files and database)
-- `volumes/homeassistant/data/` (runtime data)
-- `volumes/plex/` (metadata and configuration)
-- `$VIDEO_PATH` (video library)
-- `$IMAGE_PATH` (photo library)
-- `$DOC_PATH` (document storage)
+**User Data:**
+- `volumes/nextcloud/` - User files and database
+- `volumes/homeassistant/data/` - Runtime data
+- `volumes/plex/` - Metadata and settings
+- `$MOVIES_PATH` and `$SERIES_PATH` - Media files
 
-**System state:**
-- Cron jobs: `crontab -l > crontab_backup.txt`
-- Secret files: `secrets/db_password`, `secrets/db_root_password`
+**System:**
+- `crontab -l > crontab_backup.txt`
+- `secrets/db_password` and `secrets/db_root_password`
 
-### Git Workflow
+## 🔐 Security & Privacy
 
-**Privacy-Focused Configuration:**
-The `.gitignore` file excludes all personal data:
-- ✅ `volumes/` - All container data and configs
-- ✅ `backup/` - Automated backups
-- ✅ `logs/` - Application logs
-- ✅ `nginx/` - Generated configs and certificates
-- ✅ `secrets/` - Database passwords
-- ✅ `tools/.env` - Your configuration settings
+### Git Protection
+
+`.gitignore` excludes all sensitive data:
+- `volumes/` - All container data
+- `logs/` - Application logs
+- `secrets/` - Database passwords
+- `nginx/cert/` - SSL certificates
+- `tools/.env*` - Configuration files
+- `backup/` - Config backups
+
+**Safe to commit:**
+- Scripts (`*.sh`)
+- Documentation (`README.md`)
+- Dockerfiles
+- Base configurations
+
+### Removing Sensitive Data from History
+
+If you accidentally committed sensitive files:
 
 ```bash
-# Only commit scripts and documentation
-git add tools/*.sh
-git add home_start.sh home_stop.sh home_update.sh
-git add README.md
-git commit -m "Update automation scripts"
-git push
-
-# Your personal configs stay private and safe!
-```
-
-**Note:** If you accidentally committed sensitive files, use `git-filter-repo` to remove them from history:
-```bash
+# Install git-filter-repo
 sudo apt install git-filter-repo
+
+# Remove sensitive path
 git filter-repo --path volumes/homeassistant/config/ --invert-paths
+
+# Force push
 git push --force --all
 ```
 
-### 🔄 Scheduled Sync Backup
-
-```bash
-# Backup current cron configuration
-crontab -l > crontab_backup.txt
-
-# Restore cron jobs after system migration
-crontab crontab_backup.txt
-
-# Verify scheduled sync is working after restore
-./tools/scheduled-sync.sh
-tail -f logs/scheduled-sync.log
-```
-
-### Cron Example: Automated Backups
-
-Use the included helper to install a daily cron job that runs the repository backup.
-
-Install (for the current user):
-
-```bash
-# Make the installer executable and run it (no sudo required for user crontab)
-chmod +x tools/install_backup_cron.sh
-./tools/install_backup_cron.sh
-
-# Verify the installed cron
-crontab -l
-```
-
-Manual crontab entry (example — runs backup daily at 03:00):
-
-```cron
-0 3 * * * /full/path/to/rpi-home-plex/tools/backup_config.sh >> /full/path/to/rpi-home-plex/logs/backup.log 2>&1
-```
-
-Notes:
-- The installer avoids duplicate entries and preserves existing cron jobs.
-- Backups are stored in `home/server_config_backup/` inside the project and rotated (default keep: 14).
-- Adjust schedule or retention by editing `tools/install_backup_cron.sh` or setting `KEEP_COUNT` environment variable when running the backup script.
-
-
-## 🏷️ Version Requirements
+## 📊 System Requirements
 
 - **Docker**: 20.10+
 - **Docker Compose**: 3.9+
 - **OS**: Ubuntu 20.04+ / Raspberry Pi OS Bullseye+
-- **Memory**: 4GB+ recommended
-- **Storage**: 32GB+ (more for media files)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Test your changes with `./home_start.sh` (full deployment test)
-4. Validate configuration with `./tools/validate_config.sh`
-5. Commit changes (`git commit -m 'Add amazing feature'`)
-6. Push to branch (`git push origin feature/amazing-feature`)
-7. Open merge request
-
-**Development Tips:**
-- Configuration is fully automated - no hardcoded values
-- All scripts are in `tools/` directory for better organization
-- Use `./home_stop.sh` with cleanup options for testing iterations
-
-## 📄 License
-
-This project is open source and available under the MIT License.
+- **Memory**: 4GB+ recommended (8GB+ for transcoding)
+- **Storage**: 32GB+ for system, separate storage for media
 
 ## 🆘 Support
 
-For issues and questions:
-1. Run `./tools/validate_config.sh` to check configuration
-2. Check the troubleshooting section above
-3. Review service logs using `docker compose -f tools/docker-compose.yml logs <service_name>`
-4. Check deployment status with `docker compose -f tools/docker-compose.yml ps`
-5. Create an issue in the GitLab repository
-
-**Quick Diagnostics:**
+**Diagnostics:**
 ```bash
-# Check all services status
+# Check all services
 docker compose -f tools/docker-compose.yml ps
 
-# Validate configuration
+# Validate config
 ./tools/validate_config.sh
 
-# Check sync logs
+# Check logs
 tail -20 logs/scheduled-sync.log
+tail -20 logs/scheduled-cleanup.log
 
-# Test individual components
-./tools/create_ssl.sh              # Test SSL generation
-./tools/generate_nginx_config.sh   # Test nginx config
-./tools/scheduled-sync.sh          # Test sync manually
-./tools/fix_homeassistant.sh       # Fix Home Assistant configuration
+# Test components
+./tools/scheduled-sync.sh
+./tools/scheduled-cleanup.sh cleanup
 ```
 
+**Common Commands:**
+```bash
+# Restart everything
+./home_stop.sh && ./home_start.sh
+
+# Reconfigure
+./home_start.sh --reconfigure
+
+# Check cron
+crontab -l
+
+# View all logs
+docker compose -f tools/docker-compose.yml logs -f
+```
+
+## 🤝 Contributing
+
+1. Fork repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Test with `./home_start.sh`
+4. Validate with `./tools/validate_config.sh`
+5. Commit: `git commit -m 'Add amazing feature'`
+6. Push: `git push origin feature/amazing-feature`
+7. Create pull request
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
 ---
-**🔧 Zero-configuration deployment with full customization support**
+
+**🚀 One command to deploy, zero configuration needed**

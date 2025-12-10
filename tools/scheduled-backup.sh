@@ -9,6 +9,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKUP_DIR="$PROJECT_ROOT/backup"
 LOG_FILE="$PROJECT_ROOT/logs/scheduled-backup.log"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+KEEP_DAYS=${KEEP_DAYS:-3}  # Keep backups for 3 days by default (can override via env variable)
 
 # Create directories if they don't exist
 mkdir -p "$BACKUP_DIR"
@@ -115,11 +116,27 @@ backup_network() {
     log "Network config backed up to: $backup_path"
 }
 
-# Cleanup old backups (keep last 7 days)
+# Cleanup old backups (keep last N days)
 cleanup_old_backups() {
-    log "Cleaning up old backups (keeping last 7 days)..."
-    find "$BACKUP_DIR" -type d -mtime +7 -exec rm -rf {} + 2>/dev/null
-    log "Cleanup completed"
+    log "Cleaning up old backups (keeping last $KEEP_DAYS days)..."
+    
+    # Find and remove directories older than KEEP_DAYS
+    # Using maxdepth 1 to only check direct subdirectories in backup folder
+    local removed_count=0
+    
+    while IFS= read -r -d '' backup_folder; do
+        if [ -d "$backup_folder" ]; then
+            rm -rf "$backup_folder"
+            log "Removed old backup: $(basename "$backup_folder")"
+            ((removed_count++))
+        fi
+    done < <(find "$BACKUP_DIR" -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -not -path "$BACKUP_DIR" -print0 2>/dev/null)
+    
+    if [ $removed_count -eq 0 ]; then
+        log "No old backups to remove"
+    else
+        log "Cleanup completed: removed $removed_count old backup(s)"
+    fi
 }
 
 log "Starting scheduled backup job"

@@ -251,12 +251,12 @@ setup_configuration() {
     VIDEO_PATH=${VIDEO_PATH:-/home/$CURRENT_USER/videos}
     
     # Plex library subdirectories (Movies and Series)
-    read -p "Movies subdirectory name [Filmy]: " MOVIES_SUBDIR
-    MOVIES_SUBDIR=${MOVIES_SUBDIR:-Filmy}
+    read -p "Movies subdirectory name [movies]: " MOVIES_SUBDIR
+    MOVIES_SUBDIR=${MOVIES_SUBDIR:-movies}
     MOVIES_PATH="$VIDEO_PATH/$MOVIES_SUBDIR"
     
-    read -p "Series subdirectory name [Seriály]: " SERIES_SUBDIR
-    SERIES_SUBDIR=${SERIES_SUBDIR:-Seriály}
+    read -p "Series subdirectory name [series]: " SERIES_SUBDIR
+    SERIES_SUBDIR=${SERIES_SUBDIR:-series}
     SERIES_PATH="$VIDEO_PATH/$SERIES_SUBDIR"
     
     read -p "Image directory path [/home/$CURRENT_USER/images]: " IMAGE_PATH
