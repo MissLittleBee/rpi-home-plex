@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Webshare.cz Search</title>
     <link rel="stylesheet" href="static/style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -25,6 +27,17 @@
             <div class="search-form">
                 <input type="text" id="searchQuery" placeholder="Enter search term..." required>
                 <button id="searchBtn" onclick="search()">Search</button>
+            </div>
+            <div class="content-type-selector">
+                <label><strong>Download as:</strong></label>
+                <label class="radio-label">
+                    <input type="radio" name="contentType" value="movie" checked>
+                    <span>🎬 Movie</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="contentType" value="series">
+                    <span>📺 TV Series</span>
+                </label>
             </div>
             <div id="searchStatus" class="status-message"></div>
         </div>
@@ -55,4 +68,5 @@
 
     <script src="static/script.js"></script>
 </body>
+
 </html>

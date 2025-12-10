@@ -250,6 +250,15 @@ setup_configuration() {
     read -p "Video directory path [/home/$CURRENT_USER/videos]: " VIDEO_PATH
     VIDEO_PATH=${VIDEO_PATH:-/home/$CURRENT_USER/videos}
     
+    # Plex library subdirectories (Movies and Series)
+    read -p "Movies subdirectory name [Filmy]: " MOVIES_SUBDIR
+    MOVIES_SUBDIR=${MOVIES_SUBDIR:-Filmy}
+    MOVIES_PATH="$VIDEO_PATH/$MOVIES_SUBDIR"
+    
+    read -p "Series subdirectory name [Seriály]: " SERIES_SUBDIR
+    SERIES_SUBDIR=${SERIES_SUBDIR:-Seriály}
+    SERIES_PATH="$VIDEO_PATH/$SERIES_SUBDIR"
+    
     read -p "Image directory path [/home/$CURRENT_USER/images]: " IMAGE_PATH
     IMAGE_PATH=${IMAGE_PATH:-/home/$CURRENT_USER/images}
     
@@ -261,6 +270,14 @@ setup_configuration() {
         if [ ! -d "$storage_path" ]; then
             echo "Creating directory: $storage_path"
             mkdir -p "$storage_path"
+        fi
+    done
+    
+    # Create Plex subdirectories for Movies and Series
+    for plex_subdir in "$MOVIES_PATH" "$SERIES_PATH"; do
+        if [ ! -d "$plex_subdir" ]; then
+            echo "Creating Plex directory: $plex_subdir"
+            mkdir -p "$plex_subdir"
         fi
     done
     
@@ -290,6 +307,8 @@ setup_configuration() {
     echo "  VPN IP: $VPN_IP"
     echo "  Webshare Username: $WEBSHARE_USERNAME"
     echo "  Video Path: $VIDEO_PATH"
+    echo "  Movies Path: $MOVIES_PATH"
+    echo "  Series Path: $SERIES_PATH"
     echo "  Image Path: $IMAGE_PATH"
     echo "  Document Path: $DOC_PATH"
     echo "  Nextcloud User: $NEXTCLOUD_USER"
@@ -322,6 +341,8 @@ PLEX_CLAIM_TOKEN=$PLEX_CLAIM_TOKEN
 
 # Storage Configuration
 VIDEO_PATH=$VIDEO_PATH
+MOVIES_PATH=$MOVIES_PATH
+SERIES_PATH=$SERIES_PATH
 IMAGE_PATH=$IMAGE_PATH
 DOC_PATH=$DOC_PATH
 
@@ -628,6 +649,23 @@ setup_storage_permissions() {
     setup_directory_permissions "$DETECTED_IMAGE_PATH" "image" 
     setup_directory_permissions "$DETECTED_DOC_PATH" "document"
     
+    # Setup Plex subdirectories with proper permissions
+    if [ -n "$MOVIES_PATH" ] && [ -d "$MOVIES_PATH" ]; then
+        echo "Setting up Movies directory permissions..."
+        sudo chown -R $CURRENT_UID:$MEDIA_GID "$MOVIES_PATH"
+        sudo chmod -R 775 "$MOVIES_PATH"
+        sudo chmod g+s "$MOVIES_PATH"
+        echo "✓ Movies directory: $MOVIES_PATH"
+    fi
+    
+    if [ -n "$SERIES_PATH" ] && [ -d "$SERIES_PATH" ]; then
+        echo "Setting up Series directory permissions..."
+        sudo chown -R $CURRENT_UID:$MEDIA_GID "$SERIES_PATH"
+        sudo chmod -R 775 "$SERIES_PATH"
+        sudo chmod g+s "$SERIES_PATH"
+        echo "✓ Series directory: $SERIES_PATH"
+    fi
+    
     # Fix Nextcloud volume permissions (www-data user with media group)
     echo "Setting up Nextcloud volume permissions..."
     if [ -d "volumes/nextcloud/html" ] || [ -d "volumes/nextcloud/data" ]; then
@@ -644,6 +682,8 @@ setup_storage_permissions() {
     export MEDIA_GID
     export HOST_UID="$CURRENT_UID"
     export VIDEO_PATH="$DETECTED_VIDEO_PATH"
+    export MOVIES_PATH
+    export SERIES_PATH
     export IMAGE_PATH="$DETECTED_IMAGE_PATH" 
     export DOC_PATH="$DETECTED_DOC_PATH"
     
@@ -651,6 +691,8 @@ setup_storage_permissions() {
     echo "  MEDIA_GID=$MEDIA_GID"
     echo "  HOST_UID=$CURRENT_UID"
     echo "  VIDEO_PATH=$DETECTED_VIDEO_PATH"
+    echo "  MOVIES_PATH=$MOVIES_PATH"
+    echo "  SERIES_PATH=$SERIES_PATH"
     echo "  IMAGE_PATH=$DETECTED_IMAGE_PATH"
     echo "  DOC_PATH=$DETECTED_DOC_PATH"
     
@@ -747,6 +789,8 @@ if [ "$STABLE_SERVICES" -ge 6 ]; then  # All 6 services should be running (nginx
 */10 * * * * ${CURRENT_DIR}/tools/scheduled-sync.sh
 @reboot sleep 360 && ${CURRENT_DIR}/tools/scheduled-cleanup.sh
 0 */6 * * * ${CURRENT_DIR}/tools/scheduled-cleanup.sh
+@reboot sleep 300 && ${CURRENT_DIR}/tools/scheduled-backup.sh
+0 2 * * * ${CURRENT_DIR}/tools/scheduled-backup.sh
 CRONEOF
         
         echo "✓ Auto-sync cron jobs configured (every 10 minutes + on reboot)"
@@ -804,25 +848,6 @@ echo "  • View all cron jobs: crontab -l"
 echo "  • Manual sync: ./tools/scheduled-sync.sh"
 echo "  • Manual cleanup: ./tools/scheduled-cleanup.sh"
 echo ""
-echo "📋 Next steps:"
-echo "  1. 🌩️  Set up Nextcloud at https://${HOSTNAME}/nextcloud/"
-echo "     • Create admin account (username: ${NEXTCLOUD_USER:-admin})"
-echo "     • Database type: MySQL/MariaDB"
-echo "     • Database user: nextcloud"
-echo "     • Database password: $(cat secrets/db_password 2>/dev/null | head -c 20)..."
-echo "     • Database name: nextcloud"  
-echo "     • Database host: db (leave port empty)"
-echo "     • Data folder: /var/www/html/data (default)"
-echo ""
-echo "  2. 🏠 Set up Home Assistant at https://${HOSTNAME}/"
-echo ""
-echo "  3. 🎬 Set up Plex Media Server:"
-echo "     • Web browser access: https://${HOSTNAME}/plex/ (configured as local network)"
-echo "     • Direct device access: http://${SERVER_IP}:32400 (for apps, smart TVs)"
-echo "     • Add video library pointing to: /media/videos"
-echo "     • Server should already be claimed to your Plex account"
-echo ""
-echo "  4. 🔍 Test webshare search and download at https://${HOSTNAME}/ws/"
 echo ""
 echo "🔧 Troubleshooting:"
 echo "  • Fix Home Assistant issues: ./tools/fix_homeassistant.sh"
@@ -838,6 +863,8 @@ else
     echo "  • Media group: not configured"
 fi
 echo "  • Video path: ${DETECTED_VIDEO_PATH:-not detected}"
+echo "    - Movies subdir: ${MOVIES_PATH:-not detected}"
+echo "    - Series subdir: ${SERIES_PATH:-not detected}"
 echo "  • Image path: ${DETECTED_IMAGE_PATH:-not detected}"
 echo "  • Document path: ${DETECTED_DOC_PATH:-not detected}"
 echo "  • Config file: $([ -f "$SCRIPT_DIR/config" ] && echo "config" || echo "tools/.env or auto-detected")"
@@ -848,6 +875,14 @@ echo "  • Direct Access (Apps): http://${SERVER_IP}:32400 - For mobile apps, s
 echo "  • Auto-discovery: Devices on your network will find Plex automatically"
 echo "  • Both access methods support full streaming quality and local network features"
 echo ""
+echo "🎬 PLEX SETUP:"
+echo "  1. Go to: https://${HOSTNAME}/plex/ or http://${SERVER_IP}:32400/web"
+echo "  2. Sign in with your Plex account"
+echo "  3. Name your server (e.g., 'Home Server')"
+echo "  4. Add library: Movies -> Browse for folder -> /media/videos/movies"
+echo "  5. Add library: TV Shows -> Browse for folder -> /media/videos/series"
+echo ""
+echo "🔍 Test webshare search and download at https://${HOSTNAME}/ws/"
 echo "📝 Manual Setup Instructions:"
 echo ""
 echo "🌩️  NEXTCLOUD SETUP:"
@@ -859,14 +894,6 @@ echo "     Database password: $(cat secrets/db_password 2>/dev/null || echo '[pa
 echo "     Database host: db"
 echo "     Leave other fields as default"
 echo "  4. Click 'Finish setup'"
-echo ""
-echo "🎬 PLEX SETUP:"
-echo "  1. Go to: https://${HOSTNAME}/plex/ or http://${SERVER_IP}:32400/web"
-echo "  2. Sign in with your Plex account"
-echo "  3. Name your server (e.g., 'Home Server')"
-echo "  4. Add library: Movies -> Browse for folder -> /media/videos"
-echo "  5. Add library: TV Shows -> Browse for folder -> /media/videos"
-echo ""
 echo "⚠️  Common Issues:"
 echo "  • Downloaded files not visible in Nextcloud/Plex: Run ./tools/scheduled-cleanup.sh cleanup"
 echo "  • Plex shows 'Remote Access' in web browser: This is normal for reverse proxy, streaming still works"

@@ -24,6 +24,8 @@ active_downloads = {}
 WEBSHARE_USERNAME = os.environ.get('WEBSHARE_USERNAME')
 WEBSHARE_PASSWORD = os.environ.get('WEBSHARE_PASSWORD')
 DOWNLOAD_PATH = os.environ.get('DOWNLOAD_PATH', '/downloads')
+MOVIES_PATH = os.environ.get('MOVIES_PATH', '/downloads/movies')
+SERIES_PATH = os.environ.get('SERIES_PATH', '/downloads/series')
 
 # Auto-login on startup if credentials are provided
 login_status = "not_configured"
@@ -191,9 +193,18 @@ def download():
         data = request.get_json()
         file_id = data.get('fileId')
         file_name = data.get('fileName')
+        content_type = data.get('contentType', 'movie')  # 'movie' or 'series'
         
         if not file_id:
             return jsonify({'success': False, 'error': 'File ID is required'}), 400
+        
+        # Determine download path based on content type
+        if content_type == 'series':
+            download_path = SERIES_PATH
+        else:
+            download_path = MOVIES_PATH
+        
+        logger.info(f'Downloading {file_name} as {content_type} to {download_path}')
         
         # Check if already downloading
         if file_id in active_downloads:
@@ -204,10 +215,10 @@ def download():
                 'progress': active_downloads[file_id]['progress']
             })
         
-        # Start background download
+        # Start background download with correct path
         download_thread = threading.Thread(
             target=download_file_background,
-            args=(file_id, file_name, DOWNLOAD_PATH),
+            args=(file_id, file_name, download_path),
             daemon=True
         )
         download_thread.start()
@@ -243,22 +254,39 @@ def download_progress(file_id):
 
 @app.route('/api/downloads')
 def list_downloads():
-    """List downloaded files"""
+    """List downloaded files from both movies and series directories"""
     try:
-        if not os.path.exists(DOWNLOAD_PATH):
-            return jsonify({'success': True, 'files': []})
-        
         files = []
-        for filename in os.listdir(DOWNLOAD_PATH):
-            filepath = os.path.join(DOWNLOAD_PATH, filename)
-            if os.path.isfile(filepath):
-                stat = os.stat(filepath)
-                files.append({
-                    'name': filename,
-                    'size': stat.st_size,
-                    'sizeFormatted': webshare_client._format_file_size(stat.st_size),
-                    'modified': stat.st_mtime
-                })
+        
+        # List movies
+        if os.path.exists(MOVIES_PATH):
+            for filename in os.listdir(MOVIES_PATH):
+                filepath = os.path.join(MOVIES_PATH, filename)
+                if os.path.isfile(filepath):
+                    stat = os.stat(filepath)
+                    files.append({
+                        'name': filename,
+                        'size': stat.st_size,
+                        'sizeFormatted': webshare_client._format_file_size(stat.st_size),
+                        'modified': stat.st_mtime,
+                        'type': 'movie',
+                        'typeLabel': '🎬 Movie'
+                    })
+        
+        # List series
+        if os.path.exists(SERIES_PATH):
+            for filename in os.listdir(SERIES_PATH):
+                filepath = os.path.join(SERIES_PATH, filename)
+                if os.path.isfile(filepath):
+                    stat = os.stat(filepath)
+                    files.append({
+                        'name': filename,
+                        'size': stat.st_size,
+                        'sizeFormatted': webshare_client._format_file_size(stat.st_size),
+                        'modified': stat.st_mtime,
+                        'type': 'series',
+                        'typeLabel': '📺 Series'
+                    })
         
         # Sort by modification time (newest first)
         files.sort(key=lambda x: x['modified'], reverse=True)
