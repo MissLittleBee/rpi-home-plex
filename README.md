@@ -365,6 +365,86 @@ Media files are organized in separate directories with automated management:
 - ✅ Automatic metadata fetching and library organization
 - ✅ Survives system reboots with cron automation
 
+#### 🚨 Critical: Plex Library Path Configuration
+
+**⚠️ IMPORTANT**: Plex is **extremely sensitive** to library paths. You **MUST** configure library paths using **container paths**, not host paths!
+
+**Why This Matters:**
+- Your files are mounted from host to container (e.g., `/mnt/data/together/movies` → `/media/videos`)
+- Plex runs **inside the container** and only sees container paths
+- Using host paths will result in **empty libraries** (0 videos shown)
+
+**✅ Correct Library Configuration:**
+
+When setting up Plex libraries through the web interface (`https://[hostname]/plex/` or `http://[server-ip]:32400/web`):
+
+**For Movies Library:**
+   - Go to: Settings → Manage → Libraries → Add Library
+   - Type: Movies
+   - **Container Path**:  e.g. `/media/videos/Filmy` (or your movies subdirectory)
+   - ❌ **DO NOT USE**: `host path
+
+ - repeat it for all your libraries (photos, series, etc.)
+
+**Directory Structure Requirements:**
+
+Plex expects **separate directories** for different content types:
+
+```
+{VIDEO_PATH}/                    # Mounted as /media/videos in container
+├── Movies/                      # Movies directory
+│   ├── Movie Title (2024)/
+│   │   └── Movie Title (2024).mkv
+│   └── Another Movie (2023)/
+│       └── Another Movie (2023).mp4
+│
+└── Series/                    # TV Series directory
+    ├── Series Name/
+    │   ├── Season 01/
+    │   │   ├── S01E01.mkv
+    │   │   └── S01E02.mkv
+    │   └── Season 02/
+    │       └── S02E01.mkv
+    └── Another Series/
+        └── Season 01/
+            └── S01E01.mkv
+```
+
+**🔍 Webshare Integration:**
+- The webshare app automatically downloads to the correct directories
+- Movies go to `{MOVIES_PATH}` (configured in `.env`)
+- Series go to `{SERIES_PATH}` (configured in `.env`)
+- Files are automatically detected by scheduled-sync.sh every 10 minutes
+
+**🛠️ Fixing Existing Libraries:**
+
+If you already created libraries with host paths:
+
+1. **Option A - Via Web UI** (Recommended):
+   - Settings → Manage → Libraries
+   - Click library name → Edit
+   - Remove incorrect path
+   - Add correct container path (e.g., `/media/videos/movies`)
+   - Save and scan
+
+2. **Option B - Delete and Recreate**:
+   - Settings → Manage → Libraries
+   - Delete incorrectly configured library
+   - Create new library with correct container paths
+   - Plex will rescan and fetch all metadata
+
+**Verification:**
+```bash
+# Check if Plex can see your files (run on host)
+docker exec rpi_home_plex ls -la /path_to_your_movies
+docker exec rpi_home_plex ls -la path_to_your_series
+
+# Manual library refresh
+./tools/scheduled-sync.sh
+```
+
+After fixing paths, your libraries should populate within minutes!
+
 **🔍 Webshare Search Application
 
 Advanced web interface for webshare.cz API integration with comprehensive real-time features:

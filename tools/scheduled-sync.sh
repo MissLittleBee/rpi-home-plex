@@ -46,7 +46,7 @@ quick_nextcloud_scan() {
     local container_id=$(get_nextcloud_container)
     if [ -n "$container_id" ]; then
         log "Running quick Nextcloud sync..."
-        docker exec -u www-data "$container_id" php /var/www/html/occ files:scan --shallow jeyjey 2>/dev/null
+        docker exec -u www-data "$container_id" php /var/www/html/occ files:scan --shallow --all 2>/dev/null
         log "Nextcloud quick sync completed"
     else
         log "ERROR: Nextcloud container not found"
@@ -55,15 +55,31 @@ quick_nextcloud_scan() {
 
 # Plex library refresh (non-disruptive)
 plex_library_refresh() {
-    local container_id=$(docker ps --format "table {{.ID}}\t{{.Image}}" | grep "plex" | awk '{print $1}' | head -1)
-    if [ -n "$container_id" ]; then
-        log "Refreshing Plex library..."
-        # Trigger a library scan for all sections using Plex Media Scanner
-        docker exec "$container_id" /usr/lib/plexmediaserver/Plex\ Media\ Scanner --scan &>/dev/null
-        log "Plex library refresh triggered"
-    else
-        log "ERROR: Plex container not found"
+    if [ -z "$PLEX_TOKEN" ]; then
+        log "ERROR: PLEX_TOKEN not configured in .env"
+        return 1
     fi
+    
+    local plex_url="http://localhost:32400"
+    
+    log "Refreshing Plex library..."
+    
+    # Get all library sections
+    local sections=$(curl -s "${plex_url}/library/sections?X-Plex-Token=${PLEX_TOKEN}" | grep -o 'key="[0-9]*"' | grep -o '[0-9]*')
+    
+    if [ -z "$sections" ]; then
+        log "ERROR: Could not retrieve Plex library sections"
+        return 1
+    fi
+    
+    # Refresh each section (Movies and TV Shows)
+    for section_id in $sections; do
+        local section_name=$(curl -s "${plex_url}/library/sections/${section_id}?X-Plex-Token=${PLEX_TOKEN}" | grep -o 'title="[^"]*"' | head -1 | cut -d'"' -f2)
+        log "Scanning Plex library section: ${section_name} (ID: ${section_id})"
+        curl -s "${plex_url}/library/sections/${section_id}/refresh?X-Plex-Token=${PLEX_TOKEN}" -X GET >/dev/null
+    done
+    
+    log "Plex library refresh completed for all sections"
 }
 
 # Function to update Plex preferences for reverse proxy configuration (run once)

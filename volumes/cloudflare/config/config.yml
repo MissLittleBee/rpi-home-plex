@@ -1,0 +1,15 @@
+tunnel: rpi-server
+
+ingress:
+  # Route traffic to nginx reverse proxy for all services
+  - hostname: ha.barborka.party
+    service: http://192.168.0.184:8123
+  
+  - hostname: plex.barborka.party
+    service: http://192.168.0.184:32400
+
+  - hostname: nextcloud.barborka.party
+    service: http://192.168.0.184:80
+
+  # Catch-all rule (required)
+  - service: http_status:404

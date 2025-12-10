@@ -92,10 +92,6 @@ services:
       - /run/dbus:/run/dbus:ro
     devices:
       - /dev/ttyAMA0:/dev/ttyAMA0
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-      - SYS_ADMIN
 EOF
 
 # Add Bluetooth devices
@@ -135,6 +131,10 @@ fi
 
 # Continue with the rest of the Home Assistant service
 cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
     env_file:
       - .env
     environment:
@@ -219,6 +219,19 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
 networks:
   internal:
     driver: bridge
+
+cloudflare:
+  image: cloudflare/cloudflared:latest
+  container_name: cloudflare_tunnel
+  restart: unless-stopped
+  command: tunnel --no-autoupdate run
+  env_file:
+    - .env
+  environment:
+    - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    - internal
+  volumes:
+    - ../volumes/cloudflare/config:/config
 EOF
 
 # Set executable permissions
@@ -233,6 +246,7 @@ echo "  • Image path: ${IMAGE_PATH}"
 echo "  • Document path: ${DOC_PATH}"
 echo "  • Nextcloud user: ${NEXTCLOUD_USER}"
 echo "  • Timezone: ${TIMEZONE}"
+echo "  • Cloudflare Tunnel: ${CLOUDFLARE_TUNNEL_NAME}"
 
 # Report Bluetooth support
 echo "  • Bluetooth support: ✅ Enabled with hardware access"
