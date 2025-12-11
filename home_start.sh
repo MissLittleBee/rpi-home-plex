@@ -668,6 +668,15 @@ setup_storage_permissions() {
     setup_directory_permissions "$DETECTED_DOC_PATH" "document"
     
     # Setup Plex subdirectories with proper permissions
+    # First, ensure the parent VIDEO_PATH directory has correct permissions
+    if [ -n "$VIDEO_PATH" ] && [ -d "$VIDEO_PATH" ]; then
+        echo "Setting up video root directory permissions..."
+        sudo chown -R $CURRENT_UID:$MEDIA_GID "$VIDEO_PATH"
+        sudo chmod -R 775 "$VIDEO_PATH"
+        sudo find "$VIDEO_PATH" -type d -exec chmod g+s {} \; 2>/dev/null || true
+        echo "✓ Video root directory: $VIDEO_PATH"
+    fi
+    
     if [ -n "$MOVIES_PATH" ] && [ -d "$MOVIES_PATH" ]; then
         echo "Setting up Movies directory permissions..."
         sudo chown -R $CURRENT_UID:$MEDIA_GID "$MOVIES_PATH"

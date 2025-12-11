@@ -152,6 +152,8 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
   plex:
     image: linuxserver/plex
     container_name: rpi_home_plex
+    ports:
+      - "32400:32400"
     volumes:
       - ../volumes/plex/config:/config
       - ../volumes/plex/transcode:/transcode
@@ -174,28 +176,38 @@ fi
 
 # Continue with Plex service and add comments for local network configuration
 cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
-    network_mode: host
+    networks:
+      - internal
     restart: unless-stopped
     # Note: Plex is configured for both direct access (ports) and reverse proxy (internal network)
     # Direct access: http://SERVER_IP:32400 for devices
     # Reverse proxy: https://HOSTNAME/plex/ for web browsers
 
+EOF
+
+# Calculate container paths for webshare (extract basename from full paths)
+CONTAINER_MOVIES_PATH="/downloads/$(basename "${MOVIES_PATH}")"
+CONTAINER_SERIES_PATH="/downloads/$(basename "${SERIES_PATH}")"
+
+cat >> "$SCRIPT_DIR/docker-compose.yml" << EOF
   webshare-search:
     image: rpi_home_webshare-search
     container_name: rpi_home_webshare_search
     ports:
       - "5000:5000/tcp"
     volumes:
-      - ${VIDEO_PATH}:/downloads
+      - \${VIDEO_PATH}:/downloads
     env_file:
       - .env
     environment:
       - PORT=5000
       - DEBUG=false
       - DOWNLOAD_PATH=/downloads
+      - MOVIES_PATH=${CONTAINER_MOVIES_PATH}
+      - SERIES_PATH=${CONTAINER_SERIES_PATH}
       - PLEX_URL=http://plex:32400
-      - PLEX_TOKEN=${PLEX_TOKEN}
-    user: "${HOST_UID:-1000}:${MEDIA_GID:-1001}"  # Run with media group for proper file permissions
+      - PLEX_TOKEN=\${PLEX_TOKEN}
+    user: "\${HOST_UID:-1000}:\${MEDIA_GID:-1001}"  # Run with media group for proper file permissions
     networks:
       - internal
     restart: unless-stopped
@@ -206,22 +218,23 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
       retries: 3
       start_period: 40s
 
+  cloudflare:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflare_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file:
+      - .env
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - internal
+    volumes:
+      - ../volumes/cloudflare/config:/config
+
 networks:
   internal:
     driver: bridge
-
-cloudflare:
-  image: cloudflare/cloudflared:latest
-  container_name: cloudflare_tunnel
-  restart: unless-stopped
-  command: tunnel --no-autoupdate run
-  env_file:
-    - .env
-  environment:
-    - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    - internal
-  volumes:
-    - ../volumes/cloudflare/config:/config
 EOF
 
 # Set executable permissions
