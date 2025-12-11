@@ -193,6 +193,8 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
       - PORT=5000
       - DEBUG=false
       - DOWNLOAD_PATH=/downloads
+      - PLEX_URL=http://plex:32400
+      - PLEX_TOKEN=${PLEX_TOKEN}
     user: "${HOST_UID:-1000}:${MEDIA_GID:-1001}"  # Run with media group for proper file permissions
     networks:
       - internal

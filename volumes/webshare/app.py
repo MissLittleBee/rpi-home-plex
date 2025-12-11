@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import json
+import requests
 from webshare_api import WebshareAPI
 import logging
 
@@ -26,6 +27,10 @@ WEBSHARE_PASSWORD = os.environ.get('WEBSHARE_PASSWORD')
 DOWNLOAD_PATH = os.environ.get('DOWNLOAD_PATH', '/downloads')
 MOVIES_PATH = os.environ.get('MOVIES_PATH', '/downloads/movies')
 SERIES_PATH = os.environ.get('SERIES_PATH', '/downloads/series')
+
+# Plex configuration for triggering library refresh
+PLEX_URL = os.environ.get('PLEX_URL', 'http://plex:32400')
+PLEX_TOKEN = os.environ.get('PLEX_TOKEN', '')
 
 # Auto-login on startup if credentials are provided
 login_status = "not_configured"
@@ -167,6 +172,20 @@ def download_file_background(file_id, file_name, download_path):
         active_downloads[file_id]['finalSize'] = downloaded_size
         
         logger.info(f'Download completed: {file_name} ({webshare_client._format_file_size(downloaded_size)})')
+        
+        # Trigger Plex library refresh after successful download
+        if PLEX_TOKEN:
+            try:
+                refresh_url = f'{PLEX_URL}/library/sections/all/refresh?X-Plex-Token={PLEX_TOKEN}'
+                response = requests.put(refresh_url, timeout=5)
+                if response.status_code == 200:
+                    logger.info('Successfully triggered Plex library refresh')
+                else:
+                    logger.warning(f'Plex API returned status code: {response.status_code}')
+            except Exception as e:
+                logger.error(f'Error triggering Plex library refresh: {str(e)}')
+        else:
+            logger.warning('PLEX_TOKEN not configured, skipping library refresh')
         
         # Remove from active downloads after 30 seconds
         def cleanup():
