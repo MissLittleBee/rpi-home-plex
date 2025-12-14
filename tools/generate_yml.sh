@@ -152,8 +152,6 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
   plex:
     image: linuxserver/plex
     container_name: rpi_home_plex
-    ports:
-      - "32400:32400"
     volumes:
       - ../volumes/plex/config:/config
       - ../volumes/plex/transcode:/transcode
@@ -165,6 +163,7 @@ cat >> "$SCRIPT_DIR/docker-compose.yml" << 'EOF'
       - PGID=${MEDIA_GID:-1001}
       - TZ=${TIMEZONE}
       - VERSION=docker
+    network_mode: host
 EOF
 
 # Add PLEX_CLAIM only if provided
