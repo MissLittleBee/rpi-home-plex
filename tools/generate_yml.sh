@@ -57,6 +57,8 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    ports:
+      - "8080:80"
     volumes:
       - ../volumes/nextcloud/html:/var/www/html
       - ../volumes/nextcloud/data:/var/www/html/data

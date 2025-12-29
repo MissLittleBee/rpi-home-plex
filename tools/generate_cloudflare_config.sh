@@ -32,6 +32,9 @@ ingress:
   
   - hostname: nextcloud.${DOMAIN_NAME}
     service: http://${SERVER_IP}:80
+  
+  - hostname: ws.${DOMAIN_NAME}
+  service: http://${SERVER_IP}:5000
 
   # Catch-all rule (required)
   - service: http_status:404
